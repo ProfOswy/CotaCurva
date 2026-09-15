@@ -29,7 +29,7 @@ As camadas de mapa/satélite e de elevação pertencem a seus respectivos proved
 
 ## Contato
 
-Para permissões, parcerias ou dúvidas: https://www.youtube.com/@ProfOswy
+Para permissões, parcerias ou dúvidas: https://www.youtube.com/@ProfOswy - profoswy@gmail.com - instagram: rodrigo.osw
 
 ---
 
