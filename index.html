@@ -62,6 +62,15 @@ textarea{resize:vertical; min-height:120px; line-height:1.5; white-space:pre; ov
 select:focus,input:focus,textarea:focus{outline:2px solid var(--accent); outline-offset:-1px; border-color:transparent}
 input[type=color]{width:100%; height:34px; background:var(--panel-2); border:1px solid var(--hair-strong); border-radius:7px; padding:2px; cursor:pointer}
 input[type=range]{width:100%; accent-color:var(--accent); cursor:pointer}
+input[type=text]{width:100%; background:var(--panel-2); color:var(--text); border:1px solid var(--hair-strong); border-radius:7px; padding:8px 10px; font-family:inherit; font-size:13px}
+input[type=text]:focus{outline:2px solid var(--accent); outline-offset:-1px; border-color:transparent}
+.searchrow{display:flex; gap:8px}
+.searchsug{margin-top:6px; border:1px solid var(--hair-strong); border-radius:7px; overflow:hidden; background:var(--panel-2)}
+.searchsug.hide{display:none}
+.sugitem{padding:8px 10px; font-size:12px; color:var(--text); cursor:pointer; border-bottom:1px solid var(--hair); line-height:1.35}
+.sugitem:last-child{border-bottom:0}
+.sugitem:hover{background:var(--panel-3)}
+.sugitem small{display:block; color:var(--faint); font-size:10.5px}
 .two{display:grid; grid-template-columns:1fr 1fr; gap:10px}
 
 .btn{width:100%; border:0; border-radius:7px; padding:11px 12px; cursor:pointer; font-family:inherit;
@@ -134,6 +143,16 @@ input[type=range]{width:100%; accent-color:var(--accent); cursor:pointer}
     <div class="head">
       <h1><span class="tick">◭</span> CotaCurva</h1>
       <p>Gere isolinhas a partir de dados de satélite (por área) ou de pontos levantados em campo (UTM + cota).</p>
+    </div>
+
+    <div class="sec" style="position:relative">
+      <div class="lbl">Buscar local</div>
+      <div class="searchrow">
+        <input id="searchInput" type="text" placeholder="Endereço, cidade ou lat, lon…" autocomplete="off">
+        <button id="searchBtn" class="btn primary" style="width:auto; padding:11px 16px">Ir</button>
+      </div>
+      <div id="searchSug" class="searchsug hide"></div>
+      <div id="searchStatus" class="hint" style="margin-top:6px"></div>
     </div>
 
     <div class="tabs">
@@ -336,6 +355,55 @@ function noteSatLoad(){ const now=Date.now(); if(!satErrTimes.length || now-satE
 imagem.on('tileerror',noteSatError); rotulos.on('tileerror',noteSatError); imagem.on('tileload',noteSatLoad);
 ruas.on('tileerror',noteSatError); ruas.on('tileload',noteSatLoad);
 map.on('baselayerchange',()=>{ hideSatWarn(); satErrTimes=[]; });
+
+// busca de local (Nominatim / OpenStreetMap)
+let searchMarker=null;
+const searchInput=document.getElementById('searchInput'), searchStatus=document.getElementById('searchStatus');
+function addSearchMarker(lat,lon,label){
+  if(searchMarker) map.removeLayer(searchMarker);
+  searchMarker=L.marker([lat,lon]).addTo(map);
+  if(label) searchMarker.bindPopup(label).openPopup();
+}
+async function doSearch(){
+  const q=(searchInput.value||'').trim(); if(!q) return;
+  const mm=q.match(/^\s*(-?\d{1,3}(?:\.\d+)?)\s*[,; ]\s*(-?\d{1,3}(?:\.\d+)?)\s*$/);
+  searchStatus.textContent='Buscando…'; searchStatus.classList.remove('warn');
+  try{
+    if(mm){ const la=+mm[1], lo=+mm[2]; map.setView([la,lo],16); addSearchMarker(la,lo,`${la.toFixed(5)}, ${lo.toFixed(5)}`); searchStatus.textContent=''; return; }
+    const r=await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&countrycodes=br&limit=1&q=${encodeURIComponent(q)}`,{headers:{'Accept':'application/json'}});
+    if(!r.ok) throw new Error('http '+r.status);
+    const data=await r.json();
+    if(!data.length){ searchStatus.textContent='Não encontrado. Tente incluir cidade e estado.'; searchStatus.classList.add('warn'); return; }
+    const res=data[0], la=+res.lat, lo=+res.lon;
+    if(res.boundingbox){ const bb=res.boundingbox.map(Number); map.fitBounds([[bb[0],bb[2]],[bb[1],bb[3]]]); } else map.setView([la,lo],15);
+    addSearchMarker(la,lo,res.display_name); searchStatus.textContent='';
+  }catch(err){ searchStatus.textContent='Busca indisponível no momento. Tente novamente.'; searchStatus.classList.add('warn'); }
+}
+document.getElementById('searchBtn').addEventListener('click',doSearch);
+const searchSug=document.getElementById('searchSug');
+let sugTimer=null, sugFeatures=[];
+function esc(s){ return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function labelParts(p){ const parts=[]; const first=p.name||[p.street,p.housenumber].filter(Boolean).join(' '); if(first) parts.push(first);
+  const loc=p.city||p.county||p.district; if(loc&&loc!==first) parts.push(loc); if(p.state) parts.push(p.state); if(p.country) parts.push(p.country); return parts; }
+function hideSug(){ searchSug.classList.add('hide'); searchSug.innerHTML=''; sugFeatures=[]; }
+function renderSug(features){ sugFeatures=features; if(!features.length){ hideSug(); return; }
+  searchSug.innerHTML=features.map((f,i)=>{ const parts=labelParts(f.properties), main=parts[0]||'—', rest=parts.slice(1).join(', ');
+    return `<div class="sugitem" data-i="${i}">${esc(main)}${rest?`<small>${esc(rest)}</small>`:''}</div>`; }).join('');
+  searchSug.classList.remove('hide'); }
+function pickSug(i){ const f=sugFeatures[i]; if(!f) return; const co=f.geometry.coordinates, la=+co[1], lo=+co[0], p=f.properties;
+  searchInput.value=labelParts(p).join(', '); const ex=p.extent;
+  if(ex) map.fitBounds([[ex[3],ex[0]],[ex[1],ex[2]]]); else map.setView([la,lo],15);
+  addSearchMarker(la,lo,labelParts(p).join(', ')); hideSug(); searchStatus.textContent=''; }
+async function fetchSug(q){ try{ const c=map.getCenter();
+  const r=await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=8&lat=${c.lat}&lon=${c.lng}`);
+  if(!r.ok) return; const data=await r.json();
+  const br=(data.features||[]).filter(f=>{ const cc=(f.properties.countrycode||f.properties.country||'').toUpperCase(); return cc==='BR'||cc==='BRASIL'||cc==='BRAZIL'; }).slice(0,6);
+  renderSug(br); }catch(e){} }
+searchSug.addEventListener('mousedown',e=>{ const it=e.target.closest('.sugitem'); if(it){ e.preventDefault(); pickSug(+it.dataset.i); } });
+searchInput.addEventListener('input',()=>{ const q=searchInput.value.trim(); if(sugTimer) clearTimeout(sugTimer);
+  if(q.length<3 || /^\s*-?\d/.test(q)){ hideSug(); return; } sugTimer=setTimeout(()=>fetchSug(q),350); });
+searchInput.addEventListener('blur',()=>setTimeout(hideSug,150));
+searchInput.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); if(sugFeatures.length) pickSug(0); else doSearch(); } else if(e.key==='Escape'){ hideSug(); } });
 
 let activeTab='mapa';
 let contourLayer=null, ptsLayer=null, lastContours=null, lastMeta=null, lastGrid=null;
@@ -1017,6 +1085,7 @@ function clearAll(){
   profPts=[]; clearProf(); if(profPanel) profPanel.classList.add('hide');
   if(contourLayer){map.removeLayer(contourLayer);contourLayer=null;}
   if(ptsLayer){map.removeLayer(ptsLayer);ptsLayer=null;}
+  if(searchMarker){map.removeLayer(searchMarker);searchMarker=null;}
   lastContours=null; lastMeta=null; lastProfile=null; lastGrid=null;
   document.getElementById('resOut').innerHTML='<div class="empty">Ainda sem curvas geradas.</div>';
   document.getElementById('legend').classList.remove('on');
