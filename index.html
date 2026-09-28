@@ -118,6 +118,10 @@ input[type=text]:focus{outline:2px solid var(--accent); outline-offset:-1px; bor
   background:var(--amber); color:#241704; border-radius:8px; padding:9px 14px; font-size:12.5px; font-weight:600;
   box-shadow:0 4px 16px rgba(0,0,0,.45); display:none; text-align:center}
 .satwarn.on{display:block}
+.zoomwarn{top:auto; bottom:16px}
+.vtx-wrap{background:transparent; border:0}
+.vtx{display:block; width:12px; height:12px; margin:2px; border-radius:50%; background:#cfe0f2; border:2px solid #3277c0; box-shadow:0 1px 4px rgba(0,0,0,.5); cursor:move}
+.vtx.first{background:#3277c0}
 .profpanel{position:absolute; left:12px; right:12px; bottom:12px; z-index:600; background:rgba(10,22,38,.94);
   border:1px solid var(--hair-strong); border-radius:10px; box-shadow:0 8px 30px rgba(0,0,0,.5); overflow:hidden;}
 .profhead{display:flex; justify-content:space-between; align-items:center; padding:7px 12px; border-bottom:1px solid var(--hair); font-size:12.5px; font-weight:600; color:var(--text);}
@@ -301,9 +305,10 @@ input[type=text]:focus{outline:2px solid var(--accent); outline-offset:-1px; bor
   </aside>
 
   <div style="position:relative">
-    <div id="selhint" class="selhint">Clique para marcar vértices · duplo-clique (ou clique no 1º ponto) fecha</div>
+    <div id="selhint" class="selhint">Clique para marcar vértices · para fechar: duplo-clique, clique no 1º ponto ou arraste um vértice até ele</div>
     <div id="profHint" class="selhint">Clique o ponto inicial e o final do corte</div>
     <div id="satWarn" class="satwarn">⚠ Servidores de mapa (Esri) instáveis no momento — recarregue a página ou tente novamente em instantes.</div>
+    <div id="zoomWarn" class="satwarn zoomwarn">🔍 Zoom muito alto — se a imagem de satélite ficar em branco, esta região não tem imagem neste nível. Afaste o zoom.</div>
     <div id="map"></div>
     <div id="profilePanel" class="profpanel hide">
       <div class="profhead"><span>Perfil de elevação — corte do terreno</span><button id="profClose" title="Fechar">✕</button></div>
@@ -355,6 +360,8 @@ function noteSatLoad(){ const now=Date.now(); if(!satErrTimes.length || now-satE
 imagem.on('tileerror',noteSatError); rotulos.on('tileerror',noteSatError); imagem.on('tileload',noteSatLoad);
 ruas.on('tileerror',noteSatError); ruas.on('tileload',noteSatLoad);
 map.on('baselayerchange',()=>{ hideSatWarn(); satErrTimes=[]; });
+function checkZoom(){ const w=document.getElementById('zoomWarn'); if(w) w.classList.toggle('on', map.getZoom()>=18); }
+map.on('zoomend',checkZoom); checkZoom();
 
 // busca de local (Nominatim / OpenStreetMap)
 let searchMarker=null;
@@ -417,29 +424,49 @@ document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>{
 }));
 
 /* ---------- seleção por polígono (aba mapa) ---------- */
-let selecting=false, polyPts=[], drawLayer=null, vtxLayer=null, polygon=null;
+let selecting=false, polyPts=[], vtxLayer=null, polyShape=null, polygonClosed=false;
 const selBtn=document.getElementById('selBtn');
 const selhint=document.getElementById('selhint');
+const SELHINT_DEFAULT='Clique para marcar vértices · para fechar: duplo-clique, clique no 1º ponto ou arraste um vértice até ele';
 
 function armSelect(on){
   if(on && typeof profiling!=='undefined' && profiling) armProfile(false);
+  if(on) selhint.textContent=SELHINT_DEFAULT;
   selecting=on;
   selBtn.classList.toggle('armed',on);
-  selBtn.textContent= on?'Finalize no mapa (duplo-clique fecha)':(polygon?'Redefinir área':'Selecionar área (polígono)');
+  selBtn.textContent= on?'Finalize no mapa (duplo-clique fecha)':(polygonClosed?'Redefinir área':'Selecionar área (polígono)');
   selhint.classList.toggle('on',on);
   map.getContainer().style.cursor= on?'crosshair':'';
   if(on){ map.doubleClickZoom.disable(); } else { map.doubleClickZoom.enable(); }
 }
-function clearDraw(){ if(drawLayer){map.removeLayer(drawLayer);drawLayer=null;} if(vtxLayer){map.removeLayer(vtxLayer);vtxLayer=null;} }
-function redraw(){
-  clearDraw();
-  if(polyPts.length){
-    drawLayer=L.polyline(polyPts,{color:'#3277c0',weight:2,dashArray:'4 3'}).addTo(map);
-    vtxLayer=L.layerGroup(polyPts.map((p,i)=>L.circleMarker(p,{radius:i===0?5:3,color:'#3277c0',fillColor:'#cfe0f2',fillOpacity:1,weight:2}))).addTo(map);
-  }
+function clearPolyLayers(){ if(polyShape){map.removeLayer(polyShape);polyShape=null;} if(vtxLayer){map.removeLayer(vtxLayer);vtxLayer=null;} }
+function redrawShape(){
+  if(polyShape) map.removeLayer(polyShape);
+  if(polyPts.length<2){ polyShape=null; return; }
+  polyShape = (polygonClosed && polyPts.length>=3)
+    ? L.polygon(polyPts,{color:'#3277c0',weight:2,fillColor:'#3277c0',fillOpacity:.08,interactive:false}).addTo(map)
+    : L.polyline(polyPts,{color:'#3277c0',weight:2,dashArray:'4 3',interactive:false}).addTo(map);
+}
+function makeHandle(latlng,idx){
+  const m=L.marker(latlng,{draggable:true, keyboard:false,
+    icon:L.divIcon({className:'vtx-wrap', html:`<span class="vtx${idx===0?' first':''}"></span>`, iconSize:[16,16], iconAnchor:[8,8]})});
+  m._idx=idx;
+  const nearStart=()=>{ if(polyPts.length<3||m._idx===0) return false;
+    const p0=map.latLngToContainerPoint(polyPts[0]), pd=map.latLngToContainerPoint(m.getLatLng()); return p0.distanceTo(pd)<14; };
+  m.on('drag',()=>{ polyPts[m._idx]=m.getLatLng(); redrawShape();
+    if(!polygonClosed) selhint.textContent = nearStart()?'Solte para fechar o polígono':SELHINT_DEFAULT; });
+  m.on('dragend',()=>{ polyPts[m._idx]=m.getLatLng();
+    if(!polygonClosed && nearStart()){ if(polyPts.length>=4) polyPts.splice(m._idx,1); selhint.textContent=SELHINT_DEFAULT; closePoly(); return; }
+    redrawShape(); if(polygonClosed) updateArea(); else selhint.textContent=SELHINT_DEFAULT; });
+  if(idx===0) m.on('click',()=>{ if(selecting && polyPts.length>=3) closePoly(); });
+  return m;
+}
+function rebuildHandles(){
+  if(vtxLayer) map.removeLayer(vtxLayer);
+  vtxLayer=L.layerGroup(polyPts.map((p,i)=>makeHandle(p,i))).addTo(map);
 }
 selBtn.addEventListener('click',()=>{
-  if(!selecting){ polyPts=[]; if(polygon){map.removeLayer(polygon);polygon=null;} clearDraw(); armSelect(true); }
+  if(!selecting){ polyPts=[]; polygonClosed=false; clearPolyLayers(); armSelect(true); }
   else { if(polyPts.length>=3) closePoly(); else armSelect(false); }
 });
 map.on('click',e=>{
@@ -448,12 +475,12 @@ map.on('click',e=>{
     const p0=map.latLngToContainerPoint(polyPts[0]), pc=map.latLngToContainerPoint(e.latlng);
     if(p0.distanceTo(pc)<12){ closePoly(); return; }
   }
-  polyPts.push(e.latlng); redraw();
+  polyPts.push(e.latlng); rebuildHandles(); redrawShape();
 });
 map.on('dblclick',e=>{ if(selecting && polyPts.length>=3){ closePoly(); } });
 function closePoly(){
-  clearDraw(); armSelect(false);
-  polygon=L.polygon(polyPts,{color:'#3277c0',weight:2,fillColor:'#3277c0',fillOpacity:.08}).addTo(map);
+  polygonClosed=true; armSelect(false);
+  redrawShape(); rebuildHandles();
   updateArea();
 }
 
@@ -472,7 +499,7 @@ function polyMetrics(){
 }
 function updateArea(){
   const out=document.getElementById('areaOut');
-  if(!polygon){ out.innerHTML='<div class="empty">Nenhuma área definida. Clique no botão e marque os vértices; duplo-clique fecha.</div>'; refreshGenState(); return; }
+  if(!polygonClosed){ out.innerHTML='<div class="empty">Nenhuma área definida. Clique no botão e marque os vértices; duplo-clique fecha.</div>'; refreshGenState(); return; }
   const m=polyMetrics();
   out.innerHTML=
     `<div class="row"><span>Vértices</span><span class="num">${polyPts.length}</span></div>`+
@@ -508,7 +535,7 @@ function updateField(){
 ['ptsText','utmZoneIn','hemiIn'].forEach(id=>document.getElementById(id).addEventListener('input',updateField));
 
 function refreshGenState(){
-  const ok = activeTab==='mapa' ? !!polygon : parseField().length>=3;
+  const ok = activeTab==='mapa' ? polygonClosed : parseField().length>=3;
   document.getElementById('genBtn').disabled=!ok;
 }
 function updateGridHint(){
@@ -1080,7 +1107,7 @@ document.getElementById('profPdfBtn').addEventListener('click',()=>{ if(!lastPro
 
 function clearAll(){
   if(selecting) armSelect(false);
-  polyPts=[]; if(polygon){map.removeLayer(polygon);polygon=null;} clearDraw();
+  polyPts=[]; polygonClosed=false; clearPolyLayers();
   if(profiling) armProfile(false);
   profPts=[]; clearProf(); if(profPanel) profPanel.classList.add('hide');
   if(contourLayer){map.removeLayer(contourLayer);contourLayer=null;}
