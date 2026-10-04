@@ -159,6 +159,15 @@ input[type=text]:focus{outline:2px solid var(--accent); outline-offset:-1px; bor
       <div id="searchStatus" class="hint" style="margin-top:6px"></div>
     </div>
 
+    <div class="sec">
+      <div class="lbl">Imagem de satélite</div>
+      <div class="field">
+        <label for="imgDate">Data da captura</label>
+        <select id="imgDate"><option value="">Mais recente (atual)</option></select>
+        <span class="hint">se houver nuvens, escolha outra data para contorná-las</span>
+      </div>
+    </div>
+
     <div class="tabs">
       <div class="tab active" data-tab="mapa">Mapa / satélite</div>
       <div class="tab" data-tab="campo">Pontos de campo</div>
@@ -340,9 +349,10 @@ function applyAppearance(){const r=document.querySelector('.ramp');if(r)r.style.
 
 /* ---------- mapa ---------- */
 const map=L.map('map',{zoomControl:true}).setView([-24.0459,-52.3838],13);
+const IMG_CURRENT='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
 const ruas=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,attribution:'Esri Street Map'});
-const imagem=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,attribution:'Esri World Imagery'});
-const rotulos=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,attribution:'Esri Reference'});
+let imagem=L.tileLayer(IMG_CURRENT,{maxZoom:19,zIndex:1,attribution:'Esri World Imagery'});
+const rotulos=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,zIndex:2,attribution:'Esri Reference'});
 const satelite=L.layerGroup([imagem,rotulos]).addTo(map);
 L.control.layers({'Satélite':satelite,'Mapa':ruas},null,{position:'topright'}).addTo(map);
 const ClearCtl=L.Control.extend({options:{position:'topleft'}, onAdd:function(){
@@ -362,6 +372,27 @@ ruas.on('tileerror',noteSatError); ruas.on('tileload',noteSatLoad);
 map.on('baselayerchange',()=>{ hideSatWarn(); satErrTimes=[]; });
 function checkZoom(){ const w=document.getElementById('zoomWarn'); if(w) w.classList.toggle('on', map.getZoom()>=18); }
 map.on('zoomend',checkZoom); checkZoom();
+
+// imagem de satélite por data (Esri Wayback)
+const imgDate=document.getElementById('imgDate');
+function setImagery(url){
+  satelite.removeLayer(imagem);
+  imagem=L.tileLayer(url,{maxZoom:19,zIndex:1,attribution:'Esri World Imagery'});
+  imagem.on('tileerror',noteSatError); imagem.on('tileload',noteSatLoad);
+  satelite.addLayer(imagem);
+  BASE_URLS.satelite[0]=url;
+}
+imgDate.addEventListener('change',()=>setImagery(imgDate.value||IMG_CURRENT));
+(async function loadWayback(){
+  try{
+    const r=await fetch('https://s3-us-west-2.amazonaws.com/config.maptiles.arcgis.com/waybackconfig.json');
+    if(!r.ok) return; const cfg=await r.json();
+    const items=Object.values(cfg).map(v=>{ const mm=/(\d{4}-\d{2}-\d{2})/.exec(v.itemTitle||'');
+      return mm?{date:mm[1], url:(v.itemURL||'').replace('{level}','{z}').replace('{row}','{y}').replace('{col}','{x}')}:null; }).filter(x=>x&&x.url);
+    items.sort((a,b)=>b.date.localeCompare(a.date));
+    items.slice(0,80).forEach(it=>{ const o=document.createElement('option'); o.value=it.url; o.textContent=it.date; imgDate.appendChild(o); });
+  }catch(e){}
+})();
 
 // busca de local (Nominatim / OpenStreetMap)
 let searchMarker=null;
