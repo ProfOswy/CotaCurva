@@ -122,6 +122,19 @@ input[type=text]:focus{outline:2px solid var(--accent); outline-offset:-1px; bor
 .vtx-wrap{background:transparent; border:0}
 .vtx{display:block; width:12px; height:12px; margin:2px; border-radius:50%; background:#cfe0f2; border:2px solid #3277c0; box-shadow:0 1px 4px rgba(0,0,0,.5); cursor:move}
 .vtx.first{background:#3277c0}
+.terra-ramp{background:linear-gradient(90deg,#2c6fbf,#eef2f7,#c0392b)}
+.ctlabel.terra{background:rgba(217,138,43,.95); color:#241704; border-color:rgba(36,23,4,.5)}
+.subrow{background:var(--panel-2); border:1px solid var(--hair); border-radius:7px; padding:8px 9px; margin-bottom:7px}
+.ico{display:inline-block; width:15px; height:15px; line-height:14px; text-align:center; font-size:10px; font-weight:700; font-style:italic;
+  color:var(--panel); background:var(--muted); border-radius:50%; cursor:help; font-family:Georgia,serif; vertical-align:middle}
+.ico:hover{background:var(--accent); color:#fff}
+.infotip-pop{position:fixed; z-index:900; max-width:250px; background:#0c1b30; color:var(--text); border:1px solid var(--accent);
+  border-radius:9px; padding:10px 12px; font-size:12px; line-height:1.45; box-shadow:0 8px 28px rgba(0,0,0,.55); pointer-events:none; display:none}
+.infotip-pop svg{display:block; margin:0 auto 7px; width:100%; max-width:200px; height:auto; background:#132840; border-radius:6px}
+.infotip-pop p{margin:0}
+.dpt-wrap{background:transparent;border:0}
+.dpt{display:inline-block; font-family:"IBM Plex Mono",monospace; font-size:10.5px; font-weight:700; color:#fff;
+  background:#7a5cc0; border:2px solid #fff; border-radius:9px; padding:1px 5px; white-space:nowrap; box-shadow:0 1px 4px rgba(0,0,0,.5); cursor:move}
 .profpanel{position:absolute; left:12px; right:12px; bottom:12px; z-index:600; background:rgba(10,22,38,.94);
   border:1px solid var(--hair-strong); border-radius:10px; box-shadow:0 8px 30px rgba(0,0,0,.5); overflow:hidden;}
 .profhead{display:flex; justify-content:space-between; align-items:center; padding:7px 12px; border-bottom:1px solid var(--hair); font-size:12.5px; font-weight:600; color:var(--text);}
@@ -171,6 +184,7 @@ input[type=text]:focus{outline:2px solid var(--accent); outline-offset:-1px; bor
     <div class="tabs">
       <div class="tab active" data-tab="mapa">Mapa / satélite</div>
       <div class="tab" data-tab="campo">Pontos de campo</div>
+      <div class="tab" data-tab="terra">Terraplanagem</div>
     </div>
 
     <!-- ===== ABA MAPA ===== -->
@@ -220,7 +234,7 @@ input[type=text]:focus{outline:2px solid var(--accent); outline-offset:-1px; bor
     </div>
 
     <!-- ===== PARÂMETROS (compartilhado) ===== -->
-    <div class="sec">
+    <div class="sec curveflow">
       <div class="lbl">Parâmetros <span class="step">03</span></div>
       <div class="two">
         <div class="field">
@@ -279,7 +293,7 @@ input[type=text]:focus{outline:2px solid var(--accent); outline-offset:-1px; bor
       </div>
     </div>
 
-    <div class="sec">
+    <div class="sec curveflow">
       <div class="lbl">Processar <span class="step">05</span></div>
       <button id="genBtn" class="btn primary" disabled>Gerar curvas</button>
       <div id="prog" class="prog"><i></i></div>
@@ -287,7 +301,7 @@ input[type=text]:focus{outline:2px solid var(--accent); outline-offset:-1px; bor
       <button id="clearBtn" class="btn ghost" style="margin-top:10px">⟲ Limpar mapa</button>
     </div>
 
-    <div class="sec">
+    <div class="sec curveflow">
       <div class="lbl">Resultado <span class="step">06</span></div>
       <div id="resOut" class="readout"><div class="empty">Ainda sem curvas geradas.</div></div>
       <div id="legend" class="legend">
@@ -302,10 +316,62 @@ input[type=text]:focus{outline:2px solid var(--accent); outline-offset:-1px; bor
       </div>
     </div>
 
-    <div class="sec">
+    <div class="sec curveflow">
       <div class="lbl">Perfil de elevação <span class="step">07</span></div>
       <button id="profBtn" class="btn select">Traçar perfil (2 pontos)</button>
       <span class="hint" style="margin-top:8px;display:block">Clique dois pontos no mapa para ver o corte do terreno entre eles.</span>
+    </div>
+
+    <!-- ===== ABA TERRAPLANAGEM (após o perfil) ===== -->
+    <div class="sec tabpane hide" data-pane="terra">
+      <div class="lbl">Terraplanagem — corte e aterro <span class="step">08</span></div>
+      <div id="terraReq" class="empty" style="margin-bottom:4px">Gere as curvas de uma área (aba Mapa) primeiro — a terraplanagem usa aquele relevo.</div>
+      <div id="terraCtl" class="hide">
+        <div class="field">
+          <label for="terraMode">Critério da área inteira <span class="ico" data-tip="criterio">i</span></label>
+          <select id="terraMode">
+            <option value="eq">Nivelar na cota de equilíbrio</option>
+            <option value="plano">Cota fixa (m)</option>
+            <option value="decliv">Declividade (%)</option>
+          </select>
+          <span class="hint">usado quando não há sub-áreas, ou na parte fora delas</span>
+        </div>
+        <div class="field" id="terraCotaWrap" style="display:none">
+          <label for="terraCota">Cota do plano (m)</label>
+          <input id="terraCota" class="num" type="number" step="0.5">
+        </div>
+        <div class="field" id="terraDecWrap" style="display:none">
+          <label for="terraDec">Declividade de projeto (%) <span class="ico" data-tip="talude">i</span></label>
+          <input id="terraDec" class="num" type="number" value="2" step="0.5">
+          <span class="hint">plano inclinado seguindo o caimento do terreno, com saldo ≈ 0</span>
+        </div>
+        <div class="field" style="margin-top:4px">
+          <label>Plataformas / sub-áreas <span class="ico" data-tip="subarea">i</span></label>
+          <button id="subAddBtn" class="btn select" style="margin-top:2px">+ Nova plataforma no mapa</button>
+          <div id="subList" style="margin-top:8px"></div>
+        </div>
+        <div class="two" style="margin-top:4px">
+          <div class="field">
+            <label>Empolamento (%) <span class="ico" data-tip="empolamento">i</span></label>
+            <input id="terraEmp" class="num" type="number" value="25" min="0" step="1">
+          </div>
+          <div class="field">
+            <label>Fator compactação <span class="ico" data-tip="compactacao">i</span></label>
+            <input id="terraFc" class="num" type="number" value="0.90" min="0.5" max="1" step="0.01">
+          </div>
+        </div>
+        <button id="terraCalcBtn" class="btn primary" style="margin-top:10px">Calcular corte / aterro</button>
+        <div id="terraOut" class="readout" style="margin-top:11px"><div class="empty">Defina o critério (ou plataformas) e calcule.</div></div>
+        <div id="terraLegend" class="legend"><div class="ramp terra-ramp"></div><div class="ramp-lbl"><span>Aterro <span class="ico" data-tip="aterro">i</span></span><span class="num">equilíbrio <span class="ico" data-tip="equilibrio">i</span></span><span>Corte <span class="ico" data-tip="corte">i</span></span></div></div>
+        <div class="exp" style="margin-top:12px">
+          <button id="terraDxfBtn" class="btn ghost" disabled>DXF</button>
+          <button id="terraPngBtn" class="btn ghost" disabled>Imagem PNG</button>
+          <button id="terraPdfBtn" class="btn ghost" disabled>PDF</button>
+          <button id="terraRepBtn" class="btn ghost" disabled>Relatório PDF</button>
+          <button id="terraXlsBtn" class="btn ghost" disabled>Planilha XLSX</button>
+        </div>
+        <button id="terraClearBtn" class="btn ghost" style="margin-top:10px">⟲ Limpar terraplanagem</button>
+      </div>
     </div>
 
     <div class="sign">Criado por: Prof. Me. Rodrigo Gonçalves <b style="color:var(--text)">(Oswy)</b>
@@ -334,6 +400,7 @@ input[type=text]:focus{outline:2px solid var(--accent); outline-offset:-1px; bor
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
 <script>
 "use strict";
 const SIGN="(c) 2026 Prof. Me. Rodrigo Goncalves (Oswy) - youtube.com/@ProfOswy";
@@ -451,6 +518,8 @@ document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>{
   activeTab=t.dataset.tab;
   document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active',x===t));
   document.querySelectorAll('.tabpane').forEach(p=>p.classList.toggle('hide',p.dataset.pane!==activeTab));
+  document.querySelectorAll('.curveflow').forEach(s=>s.classList.toggle('hide',activeTab==='terra'));
+  if(activeTab==='terra') terraRefresh();
   refreshGenState(); updateGridHint();
 }));
 
@@ -462,6 +531,7 @@ const SELHINT_DEFAULT='Clique para marcar vértices · para fechar: duplo-clique
 
 function armSelect(on){
   if(on && typeof profiling!=='undefined' && profiling) armProfile(false);
+  if(on && typeof drawingSub!=='undefined' && drawingSub) armSubDraw(false);
   if(on) selhint.textContent=SELHINT_DEFAULT;
   selecting=on;
   selBtn.classList.toggle('armed',on);
@@ -969,7 +1039,7 @@ function drawDecor(ctx,W,H,z,b){
   const barpx=nice/mpp,bx2=W-pad-barpx,by2=H-pad-ls-6;
   ctx.fillStyle='rgba(255,255,255,.85)'; ctx.fillRect(bx2-4,by2-4,barpx+8,ls+16); ctx.fillStyle='#0a1512'; ctx.fillRect(bx2,by2,barpx,4);
   ctx.font=`500 ${ls}px "IBM Plex Mono",monospace`; ctx.textAlign='center'; ctx.textBaseline='top'; ctx.fillText(nice>=1000?(nice/1000)+' km':nice+' m',bx2+barpx/2,by2+7);
-  const cs=Math.max(9,Math.round(W/140)); ctx.font=`400 ${cs}px "Space Grotesk",sans-serif`; ctx.textAlign='right'; ctx.textBaseline='bottom';
+  const cs=Math.max(15,Math.round(W/75)); ctx.font=`600 ${cs}px "Space Grotesk",sans-serif`; ctx.textAlign='right'; ctx.textBaseline='bottom';
   const cred=CREDIT; const cw=ctx.measureText(cred).width;
   ctx.fillStyle='rgba(255,255,255,.72)'; ctx.fillRect(W-pad-cw-4,H-cs-6,cw+6,cs+5); ctx.fillStyle='#1b2a3a'; ctx.fillText(cred,W-pad,H-3);
 }
@@ -1010,7 +1080,7 @@ function armProfile(on){
   profBtn.textContent=on?'Clique 2 pontos no mapa…':'Traçar perfil (2 pontos)';
   profHint.classList.toggle('on',on);
   map.getContainer().style.cursor=on?'crosshair':'';
-  if(on){ map.doubleClickZoom.disable(); if(selecting) armSelect(false); profPts=[]; clearProf(); } else { map.doubleClickZoom.enable(); }
+  if(on){ map.doubleClickZoom.disable(); if(selecting) armSelect(false); if(typeof drawingSub!=='undefined'&&drawingSub) armSubDraw(false); profPts=[]; clearProf(); } else { map.doubleClickZoom.enable(); }
 }
 profBtn.addEventListener('click',()=>armProfile(!profiling));
 document.getElementById('profClose').addEventListener('click',()=>{ profPanel.classList.add('hide'); clearProf(); });
@@ -1068,46 +1138,57 @@ async function runProfile(){
   const total=dist[dist.length-1];
   if(total<1){ document.getElementById('profChart').innerHTML='<div style="padding:22px;color:#e46a63;font-size:12px">Pontos muito próximos — escolha dois pontos separados.</div>'; return; }
   const zs=res.values.map((v,i)=>v==null?(i>0?res.values[i-1]:0):v);
-  renderProfile(dist,zs,total);
+  let dzs=null;
+  if(terraDesignActive && terraDesignEval){ dzs=pts.map(p=>terraDesignEval(p[1],p[0])); }
+  renderProfile(dist,zs,total,dzs);
 }
-function renderProfile(dist,zs,total){
+function renderProfile(dist,zs,total,dzs){
   const host=document.getElementById('profChart');
   const W=Math.max(320,host.clientWidth||520), H=150, ml=48,mr=12,mt=12,mb=26;
-  const zmin=Math.min(...zs), zmax=Math.max(...zs), pad=Math.max(1,(zmax-zmin)*0.12);
+  const allz=dzs?zs.concat(dzs):zs;
+  const zmin=Math.min(...allz), zmax=Math.max(...allz), pad=Math.max(1,(zmax-zmin)*0.12);
   const x=d3.scaleLinear().domain([0,total]).range([ml,W-mr]);
   const y=d3.scaleLinear().domain([zmin-pad,zmax+pad]).range([H-mb,mt]);
   const line=dist.map((d,i)=>`${x(d).toFixed(1)},${y(zs[i]).toFixed(1)}`).join(' ');
-  const area=`${x(0).toFixed(1)},${H-mb} ${line} ${x(total).toFixed(1)},${H-mb}`;
   let g='';
   y.ticks(4).forEach(v=>{ const yy=y(v).toFixed(1); g+=`<line x1="${ml}" y1="${yy}" x2="${W-mr}" y2="${yy}" stroke="rgba(255,255,255,.08)"/><text x="${ml-6}" y="${(+yy+3)}" fill="#9fb2c9" font-size="10" text-anchor="end" font-family="IBM Plex Mono">${v.toFixed(0)}</text>`; });
   x.ticks(5).forEach(v=>{ const xx=x(v).toFixed(1); g+=`<text x="${xx}" y="${H-9}" fill="#9fb2c9" font-size="10" text-anchor="middle" font-family="IBM Plex Mono">${v>=1000?(v/1000).toFixed(1)+'k':v.toFixed(0)}</text>`; });
-  host.innerHTML=`<svg viewBox="0 0 ${W} ${H}" width="100%" height="${H}" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">${g}`+
-    `<polygon points="${area}" fill="rgba(50,119,192,.22)"/><polyline points="${line}" fill="none" stroke="#5aa0ea" stroke-width="2"/>`+
+  let body='';
+  if(dzs){ let hatch='';
+    for(let i=0;i<dist.length;i+=2){ const xi=x(dist[i]).toFixed(1), yt=y(zs[i]).toFixed(1), yd=y(dzs[i]).toFixed(1);
+      hatch+=`<line x1="${xi}" y1="${yt}" x2="${xi}" y2="${yd}" stroke="${zs[i]>=dzs[i]?'rgba(192,57,43,.55)':'rgba(44,111,191,.55)'}" stroke-width="1.3"/>`; }
+    const dline=dist.map((d,i)=>`${x(d).toFixed(1)},${y(dzs[i]).toFixed(1)}`).join(' ');
+    body=hatch+`<polyline points="${line}" fill="none" stroke="#1b2a3a" stroke-width="2"/><polyline points="${dline}" fill="none" stroke="#7a5cc0" stroke-width="2" stroke-dasharray="6 3"/>`;
+  } else { const area=`${x(0).toFixed(1)},${H-mb} ${line} ${x(total).toFixed(1)},${H-mb}`;
+    body=`<polygon points="${area}" fill="rgba(50,119,192,.22)"/><polyline points="${line}" fill="none" stroke="#5aa0ea" stroke-width="2"/>`; }
+  host.innerHTML=`<svg viewBox="0 0 ${W} ${H}" width="100%" height="${H}" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">${g}${body}`+
     `<line id="pcvl" stroke="#e0a24a" stroke-width="1.5" stroke-dasharray="4 3" style="display:none"/>`+
     `<circle id="pcvd" r="4" fill="#e0a24a" stroke="#fff" stroke-width="1.5" style="display:none"/>`+
     `<text x="${ml}" y="10" fill="#647c98" font-size="9" font-family="IBM Plex Mono">cota (m)</text>`+
     `<text x="${W-mr}" y="${H-9}" fill="#647c98" font-size="9" text-anchor="end" font-family="IBM Plex Mono">dist. (m)</text></svg>`;
   profGeom={x,y,top:mt,bot:H-mb};
   const zA=zs[0], zB=zs[zs.length-1], dz=zB-zA, slope=total>0?dz/total*100:0;
-  document.getElementById('profStats').innerHTML=
-    `<span>Comprimento<b class="num">${total.toFixed(0)} m</b></span>`+
-    `<span>Cotas<b class="num">${zmin.toFixed(1)}–${zmax.toFixed(1)} m</b></span>`+
+  let stats=`<span>Comprimento<b class="num">${total.toFixed(0)} m</b></span>`+
+    `<span>Cotas<b class="num">${Math.min(...zs).toFixed(1)}–${Math.max(...zs).toFixed(1)} m</b></span>`+
     `<span>Desnível A→B<b class="num">${dz>=0?'+':''}${dz.toFixed(1)} m</b></span>`+
     `<span>Declividade média<b class="num">${slope.toFixed(1)} %</b></span>`;
-  lastProfile={dist,zs,total};
+  if(dzs){ let ca=0,fa=0; for(let i=1;i<dist.length;i++){ const dl=dist[i]-dist[i-1], dm=((zs[i]-dzs[i])+(zs[i-1]-dzs[i-1]))/2; if(dm>0) ca+=dm*dl; else fa+=-dm*dl; }
+    stats+=`<span>Corte (seção)<b class="num">${ca.toFixed(0)} m²</b></span><span>Aterro (seção)<b class="num">${fa.toFixed(0)} m²</b></span>`; }
+  document.getElementById('profStats').innerHTML=stats;
+  lastProfile={dist,zs,total,dzs};
   document.getElementById('profExport').classList.remove('hide');
   document.getElementById('profPngBtn').disabled=false; document.getElementById('profPdfBtn').disabled=false;
 }
 
 function buildProfileCanvas(){
-  const {dist,zs,total}=lastProfile;
+  const {dist,zs,total,dzs}=lastProfile;
   const W=1400,H=620,ml=92,mr=44,mt=96,mb=92;
   const cv=document.createElement('canvas'); cv.width=W; cv.height=H; const ctx=cv.getContext('2d');
   ctx.fillStyle='#ffffff'; ctx.fillRect(0,0,W,H);
   ctx.fillStyle='#0c1b30'; ctx.fillRect(0,0,W,58);
   ctx.fillStyle='#fff'; ctx.font='700 25px "Space Grotesk",sans-serif'; ctx.textAlign='left'; ctx.textBaseline='middle';
-  ctx.fillText('Perfil de elevação — corte do terreno',24,30);
-  const zmin=Math.min(...zs),zmax=Math.max(...zs),pad=Math.max(1,(zmax-zmin)*0.12);
+  ctx.fillText(dzs?'Perfil — terreno × projeto (terraplanagem)':'Perfil de elevação — corte do terreno',24,30);
+  const allz=dzs?zs.concat(dzs):zs; const zmin=Math.min(...allz),zmax=Math.max(...allz),pad=Math.max(1,(zmax-zmin)*0.12);
   const x=d3.scaleLinear().domain([0,total]).range([ml,W-mr]);
   const y=d3.scaleLinear().domain([zmin-pad,zmax+pad]).range([H-mb,mt]);
   ctx.strokeStyle='#dbe2ea'; ctx.lineWidth=1; ctx.fillStyle='#5f7590'; ctx.font='14px "IBM Plex Mono",monospace';
@@ -1115,17 +1196,20 @@ function buildProfileCanvas(){
   y.ticks(6).forEach(v=>{ const yy=y(v); ctx.beginPath(); ctx.moveTo(ml,yy); ctx.lineTo(W-mr,yy); ctx.stroke(); ctx.fillText(v.toFixed(0),ml-8,yy); });
   ctx.textAlign='center'; ctx.textBaseline='top';
   x.ticks(8).forEach(v=>{ ctx.fillText(v>=1000?(v/1000).toFixed(1)+'k':v.toFixed(0), x(v), H-mb+8); });
-  ctx.beginPath(); ctx.moveTo(x(0),H-mb); dist.forEach((d,i)=>ctx.lineTo(x(d),y(zs[i]))); ctx.lineTo(x(total),H-mb); ctx.closePath();
-  ctx.fillStyle='rgba(50,119,192,.20)'; ctx.fill();
-  ctx.beginPath(); dist.forEach((d,i)=>{ i?ctx.lineTo(x(d),y(zs[i])):ctx.moveTo(x(d),y(zs[i])); }); ctx.strokeStyle='#2f6fb0'; ctx.lineWidth=2.5; ctx.stroke();
+  if(dzs){ for(let i=0;i<dist.length;i++){ const xi=x(dist[i]); ctx.strokeStyle=zs[i]>=dzs[i]?'rgba(192,57,43,.5)':'rgba(44,111,191,.5)'; ctx.lineWidth=1.5; ctx.beginPath(); ctx.moveTo(xi,y(zs[i])); ctx.lineTo(xi,y(dzs[i])); ctx.stroke(); } }
+  else { ctx.beginPath(); ctx.moveTo(x(0),H-mb); dist.forEach((d,i)=>ctx.lineTo(x(d),y(zs[i]))); ctx.lineTo(x(total),H-mb); ctx.closePath(); ctx.fillStyle='rgba(50,119,192,.20)'; ctx.fill(); }
+  ctx.beginPath(); dist.forEach((d,i)=>{ i?ctx.lineTo(x(d),y(zs[i])):ctx.moveTo(x(d),y(zs[i])); }); ctx.strokeStyle=dzs?'#1b2a3a':'#2f6fb0'; ctx.lineWidth=2.5; ctx.stroke();
+  if(dzs){ ctx.beginPath(); dist.forEach((d,i)=>{ i?ctx.lineTo(x(d),y(dzs[i])):ctx.moveTo(x(d),y(dzs[i])); }); ctx.strokeStyle='#7a5cc0'; ctx.lineWidth=2.5; ctx.setLineDash([8,4]); ctx.stroke(); ctx.setLineDash([]); }
   ctx.fillStyle='#5f7590'; ctx.font='14px "Space Grotesk",sans-serif'; ctx.textAlign='center'; ctx.textBaseline='alphabetic';
   ctx.fillText('Distância (m)',(ml+W-mr)/2,H-22);
   ctx.save(); ctx.translate(26,(mt+H-mb)/2); ctx.rotate(-Math.PI/2); ctx.fillText('Cota (m)',0,0); ctx.restore();
   const zA=zs[0],zB=zs[zs.length-1],dz=zB-zA,slope=total>0?dz/total*100:0;
   ctx.fillStyle='#0c1b30'; ctx.font='15px "IBM Plex Mono",monospace'; ctx.textAlign='left'; ctx.textBaseline='middle';
-  ctx.fillText(`Comprimento ${total.toFixed(0)} m    |    Cotas ${zmin.toFixed(1)}–${zmax.toFixed(1)} m    |    Desnível A→B ${dz>=0?'+':''}${dz.toFixed(1)} m    |    Declividade média ${slope.toFixed(1)}%`,ml,79);
-  ctx.fillStyle='#8a97a8'; ctx.font='13px "Space Grotesk",sans-serif'; ctx.textAlign='right'; ctx.textBaseline='bottom';
-  ctx.fillText(CREDIT,W-20,H-14);
+  let extra='';
+  if(dzs){ let ca=0,fa=0; for(let i=1;i<dist.length;i++){ const dl=dist[i]-dist[i-1], dm=((zs[i]-dzs[i])+(zs[i-1]-dzs[i-1]))/2; if(dm>0) ca+=dm*dl; else fa+=-dm*dl; } extra=`    |    Corte ${ca.toFixed(0)} m²    |    Aterro ${fa.toFixed(0)} m²`; }
+  ctx.fillText(`Comprimento ${total.toFixed(0)} m    |    Cotas ${Math.min(...zs).toFixed(1)}–${Math.max(...zs).toFixed(1)} m    |    Desnível A→B ${dz>=0?'+':''}${dz.toFixed(1)} m    |    Decliv. ${slope.toFixed(1)}%${extra}`,ml,79);
+  ctx.fillStyle='#6b7889'; ctx.font='600 20px "Space Grotesk",sans-serif'; ctx.textAlign='right'; ctx.textBaseline='bottom';
+  ctx.fillText(CREDIT,W-20,H-16);
   return cv;
 }
 document.getElementById('profPngBtn').addEventListener('click',()=>{ if(!lastProfile) return;
@@ -1136,6 +1220,389 @@ document.getElementById('profPdfBtn').addEventListener('click',()=>{ if(!lastPro
   const pw=doc.internal.pageSize.getWidth(),ph=doc.internal.pageSize.getHeight(),mg=12,r=Math.min((pw-2*mg)/cv.width,(ph-2*mg)/cv.height),iw=cv.width*r,ih=cv.height*r;
   doc.addImage(img,'PNG',(pw-iw)/2,(ph-ih)/2,iw,ih); doc.save('perfil_elevacao.pdf'); });
 
+/* ---------- TERRAPLANAGEM (corte / aterro) ---------- */
+let earthLayer=null, terraDesignActive=false, terraDesignEval=null, lastEarth=null, terraLabelLayer=null;
+let subAreas=[], drawingSub=false, subPts=[], subDrawLayer=null, subVtxLayer=null;
+const fmtV=v=>Math.round(v).toLocaleString('pt-BR');
+
+function maskPoly(){ const G=lastGrid; return polyPts.length>=3 ? polyPts.map(p=>[p.lng,p.lat]) : [[G.w,G.s],[G.e,G.s],[G.e,G.n],[G.w,G.n]]; }
+function equilibriumOf(poly){ const G=lastGrid; if(!G) return 0; let s=0,n=0;
+  for(let j=0;j<G.g;j++) for(let i=0;i<G.g;i++){ const lon=G.w+i/(G.g-1)*(G.e-G.w), lat=G.n-j/(G.g-1)*(G.n-G.s);
+    if(pip([lon,lat],poly)){ s+=G.values[j*G.g+i]; n++; } } return n?s/n:0; }
+function equilibriumCota(){ return equilibriumOf(maskPoly()); }
+function polyCentroid(poly){ let sx=0,sy=0; poly.forEach(p=>{sx+=p[0];sy+=p[1];}); return [sx/poly.length, sy/poly.length]; }
+/* ajuste de plano inclinado seguindo o caimento do terreno (mín. quadrados) */
+function fitPlane(poly,dec){ const G=lastGrid, latc=polyCentroid(poly)[1], kx=111320*Math.cos(latc*Math.PI/180), ky=110574;
+  let n=0,sx=0,sy=0,sz=0,sxx=0,sxy=0,syy=0,sxz=0,syz=0, lon0=0,lat0=0;
+  const P=[];
+  for(let j=0;j<G.g;j++) for(let i=0;i<G.g;i++){ const lon=G.w+i/(G.g-1)*(G.e-G.w), lat=G.n-j/(G.g-1)*(G.n-G.s);
+    if(!pip([lon,lat],poly)) continue; P.push([lon,lat,G.values[j*G.g+i]]); lon0+=lon; lat0+=lat; sz+=G.values[j*G.g+i]; n++; }
+  if(!n) return ()=>0; lon0/=n; lat0/=n; const z0=sz/n;
+  P.forEach(p=>{ const X=(p[0]-lon0)*kx, Y=(p[1]-lat0)*ky; sx+=X;sy+=Y;sxx+=X*X;sxy+=X*Y;syy+=Y*Y;sxz+=X*(p[2]-z0);syz+=Y*(p[2]-z0); });
+  const det=sxx*syy-sxy*sxy; let a=0,b=0; if(Math.abs(det)>1e-6){ a=(sxz*syy-syz*sxy)/det; b=(syz*sxx-sxz*sxy)/det; }
+  const gm=Math.hypot(a,b); let ux=0,uy=0; if(gm>1e-9){ ux=-a/gm; uy=-b/gm; } // direção de descida
+  const s=Math.abs(dec)/100;
+  return (lon,lat)=>{ const X=(lon-lon0)*kx, Y=(lat-lat0)*ky; return z0 - s*(X*ux+Y*uy); };
+}
+function criterionEval(poly,mode,cota,dec){
+  if(mode==='plano'){ const c=(cota!=null&&!isNaN(cota))?cota:equilibriumOf(poly); return ()=>c; }
+  if(mode==='decliv'){ return fitPlane(poly, (dec!=null&&!isNaN(dec))?dec:0); }
+  const c=equilibriumOf(poly); return ()=>c;
+}
+function criterionLabel(poly,mode,cota,dec){
+  if(mode==='plano'){ const c=(cota!=null&&!isNaN(cota))?cota:equilibriumOf(poly); return c.toFixed(1)+' m'; }
+  if(mode==='decliv'){ return 'i '+((dec!=null&&!isNaN(dec))?dec:0)+'%'; }
+  return equilibriumOf(poly).toFixed(1)+' m';
+}
+function baseCriterion(){ return {mode:document.getElementById('terraMode').value,
+  cota:parseFloat(document.getElementById('terraCota').value), dec:parseFloat(document.getElementById('terraDec').value)}; }
+function subEvaluators(){ return subAreas.map((sa,i)=>{ const poly=sa.pts.map(p=>[p.lng,p.lat]);
+  return {poly, name:`Plataforma ${i+1}`, label:criterionLabel(poly,sa.mode,sa.cota,sa.dec), fn:criterionEval(poly,sa.mode,sa.cota,sa.dec)}; }); }
+
+/* rótulos de cota/declividade no mapa (arte parecida com as curvas) */
+function renderTerraLabels(){
+  if(terraLabelLayer){ map.removeLayer(terraLabelLayer); terraLabelLayer=null; }
+  if(!lastGrid) return; const grp=L.layerGroup(); const bc=baseCriterion();
+  const mk=(poly,txt)=>{ const c=polyCentroid(poly); grp.addLayer(L.marker([c[1],c[0]],{interactive:false,keyboard:false,
+    icon:L.divIcon({className:'ctlabel-wrap', html:`<span class="ctlabel terra">${txt}</span>`})})); };
+  if(subAreas.length){ subAreas.forEach(sa=>mk(sa.pts.map(p=>[p.lng,p.lat]), criterionLabel(sa.pts.map(p=>[p.lng,p.lat]),sa.mode,sa.cota,sa.dec))); }
+  else { mk(maskPoly(), criterionLabel(maskPoly(),bc.mode,bc.cota,bc.dec)); }
+  grp.addTo(map); terraLabelLayer=grp;
+}
+
+function computeEarthwork(){
+  if(!lastGrid){ document.getElementById('terraOut').innerHTML='<div class="empty">Gere as curvas de uma área primeiro.</div>'; return; }
+  const G=lastGrid,g=G.g,poly=maskPoly(),cellA=G.dxm*G.dym, bc=baseCriterion();
+  const base=criterionEval(poly,bc.mode,bc.cota,bc.dec), subs=subEvaluators();
+  const regions=[{name:subs.length?'Fora das plataformas':'Área total',cut:0,fill:0,cells:0}].concat(subs.map(s=>({name:s.name+' ('+s.label+')',cut:0,fill:0,cells:0})));
+  const design=(lon,lat)=>{ for(let si=0;si<subs.length;si++){ if(pip([lon,lat],subs[si].poly)) return [si+1,subs[si].fn(lon,lat)]; } return [0,base(lon,lat)]; };
+  let cut=0,fill=0,cells=0,maxc=0,maxf=0; const diff=new Float64Array(g*g), inside=new Uint8Array(g*g), dz=new Float64Array(g*g);
+  for(let j=0;j<g;j++) for(let i=0;i<g;i++){ const lon=G.w+i/(g-1)*(G.e-G.w), lat=G.n-j/(g-1)*(G.n-G.s);
+    if(!pip([lon,lat],poly)) continue;
+    const r=design(lon,lat), d=G.values[j*g+i]-r[1]; diff[j*g+i]=d; dz[j*g+i]=r[1]; inside[j*g+i]=1; const R=regions[r[0]];
+    if(d>0){ cut+=d*cellA; R.cut+=d*cellA; if(d>maxc)maxc=d; } else { fill+=-d*cellA; R.fill+=-d*cellA; if(-d>maxf)maxf=-d; } R.cells++; cells++; }
+  if(!cells){ document.getElementById('terraOut').innerHTML='<div class="empty">Área vazia. Defina o polígono na aba Mapa.</div>'; return; }
+  const mag=Math.max(maxc,maxf,0.1);
+  const cv=document.createElement('canvas'); cv.width=g; cv.height=g; const ctx=cv.getContext('2d'), im=ctx.createImageData(g,g), px=im.data;
+  for(let k=0;k<g*g;k++){ const o=k*4; if(!inside[k]){ px[o+3]=0; continue; }
+    const d=diff[k], tt=Math.min(1,Math.abs(d)/mag);
+    if(d>0){ px[o]=192; px[o+1]=Math.round(70*(1-tt)); px[o+2]=Math.round(60*(1-tt)); } else { px[o]=Math.round(50*(1-tt)); px[o+1]=Math.round(110*(1-tt)); px[o+2]=191; }
+    px[o+3]=Math.round(80+160*tt); }
+  ctx.putImageData(im,0,0);
+  if(earthLayer) map.removeLayer(earthLayer);
+  earthLayer=L.imageOverlay(cv.toDataURL(),[[G.s,G.w],[G.n,G.e]],{opacity:0.62,interactive:false}).addTo(map);
+  renderTerraLabels();
+  try{ map.fitBounds([[G.s,G.w],[G.n,G.e]],{padding:[24,24]}); }catch(e){}
+  /* perfil médio (média por coluna i dentro da área) */
+  const latc=polyCentroid(poly)[1], widthM=Math.abs(G.e-G.w)*111320*Math.cos(latc*Math.PI/180);
+  const prof={dist:[],zt:[],zd:[]};
+  for(let i=0;i<g;i++){ let st=0,sd=0,nn=0; for(let j=0;j<g;j++){ const k=j*g+i; if(inside[k]){ st+=G.values[k]; sd+=dz[k]; nn++; } }
+    if(nn){ prof.dist.push(i/(g-1)*widthM); prof.zt.push(st/nn); prof.zd.push(sd/nn); } }
+  const net=cut-fill, eq=equilibriumCota();
+  terraDesignActive=true; terraDesignEval=(lon,lat)=>design(lon,lat)[1];
+  lastEarth={gcanvas:cv, g, bbox:{w:G.w,e:G.e,n:G.n,s:G.s}, cut, fill, net, eq, maxc, maxf, cells, cellA, poly, regions:subs.length?regions:null, profile:prof, subs:subs.map((s,i)=>({name:s.name,label:s.label}))};
+  renderTerraOut();
+  document.getElementById('terraLegend').classList.add('on');
+  ['terraDxfBtn','terraPngBtn','terraPdfBtn','terraRepBtn','terraXlsBtn'].forEach(id=>{const b=document.getElementById(id); if(b) b.disabled=false;});
+}
+function terraDerived(){ const E=lastEarth;
+  const e=Math.max(0,parseFloat(document.getElementById('terraEmp').value)||0);
+  const fc=Math.max(0.5,Math.min(1,parseFloat(document.getElementById('terraFc').value)||1));
+  return {e,fc,Vc:E.cut,Va:E.fill,VcLoose:E.cut*(1+e/100),Vb:E.fill/fc,saldoB:E.cut-E.fill/fc};
+}
+function renderTerraOut(){ if(!lastEarth) return; const E=lastEarth, D=terraDerived();
+  const row=(a,b,m)=>`<div class="row"><span>${a}</span><span class="num"${m?' style="color:var(--muted)"':''}>${b}</span></div>`;
+  let html=
+    row('Corte (banco)',fmtV(D.Vc)+' m³')+
+    row('Transporte (solto)',fmtV(D.VcLoose)+` m³ · +${D.e}%`)+
+    row('Aterro (compactado)',fmtV(D.Va)+' m³')+
+    row('Banco p/ aterro',fmtV(D.Vb)+` m³ · fc ${D.fc}`)+
+    row('Saldo em banco',(D.saldoB>=0?'+':'')+fmtV(D.saldoB)+' m³')+
+    row('',D.saldoB>=0?'bota-fora: '+fmtV(D.saldoB*(1+D.e/100))+' m³ soltos':'empréstimo: '+fmtV(-D.saldoB)+' m³ de banco',true)+
+    row('Cota de equilíbrio',E.eq.toFixed(2)+' m')+
+    row('Área terraplanada',(E.cells*E.cellA/10000).toFixed(2)+' ha')+
+    row('Corte máx · aterro máx',E.maxc.toFixed(1)+' · '+E.maxf.toFixed(1)+' m');
+  if(E.regions){ html+=`<div class="row" style="border-top:1px solid var(--hair);margin-top:5px;padding-top:7px"><span style="color:var(--muted)">Por plataforma (geométrico)</span><span></span></div>`;
+    E.regions.forEach(r=>{ if(r.cells) html+=`<div class="row"><span style="font-size:11px">${r.name}</span><span class="num" style="font-size:11px">C ${fmtV(r.cut)} · A ${fmtV(r.fill)} m³</span></div>`; }); }
+  document.getElementById('terraOut').innerHTML=html;
+}
+
+/* --- plataformas / sub-áreas --- */
+function clearSubDraw(){ if(subDrawLayer){map.removeLayer(subDrawLayer);subDrawLayer=null;} if(subVtxLayer){map.removeLayer(subVtxLayer);subVtxLayer=null;} }
+function redrawSub(){ clearSubDraw(); if(subPts.length){ subDrawLayer=L.polyline(subPts,{color:'#d98a2b',weight:2,dashArray:'4 3'}).addTo(map);
+  subVtxLayer=L.layerGroup(subPts.map((p,k)=>L.circleMarker(p,{radius:k===0?5:3,color:'#d98a2b',fillColor:'#ffe6c2',fillOpacity:1,weight:2}))).addTo(map); } }
+function armSubDraw(on){ drawingSub=on; const b=document.getElementById('subAddBtn');
+  b.classList.toggle('armed',on); b.textContent=on?'Desenhando plataforma… (duplo-clique fecha)':'+ Nova plataforma no mapa';
+  selhint.textContent='Clique os vértices da plataforma · duplo-clique ou 1º ponto fecha'; selhint.classList.toggle('on',on);
+  map.getContainer().style.cursor=on?'crosshair':'';
+  if(on){ map.doubleClickZoom.disable(); if(selecting) armSelect(false); if(typeof profiling!=='undefined'&&profiling) armProfile(false); subPts=[]; clearSubDraw(); }
+  else { map.doubleClickZoom.enable(); } }
+function closeSub(){ if(subPts.length<3){ armSubDraw(false); return; } const pts=subPts.slice(); clearSubDraw(); armSubDraw(false);
+  const sa={pts, mode:'eq', cota:null, dec:2, layer:L.polygon(pts,{color:'#d98a2b',weight:2,fillColor:'#d98a2b',fillOpacity:.12}).addTo(map)};
+  subAreas.push(sa); renderSubList(); renderTerraLabels(); }
+function removeSubArea(i){ const sa=subAreas[i]; if(sa&&sa.layer) map.removeLayer(sa.layer); subAreas.splice(i,1); renderSubList(); renderTerraLabels(); }
+function renderSubList(){ const el=document.getElementById('subList'); if(!el) return;
+  if(!subAreas.length){ el.innerHTML='<span class="hint">Nenhuma plataforma. A área inteira usa o critério acima. Crie plataformas para terraplanar trechos em cotas diferentes.</span>'; return; }
+  el.innerHTML=subAreas.map((sa,i)=>`<div class="subrow">
+    <div style="display:flex;justify-content:space-between;align-items:center"><b style="font-size:12px;color:var(--text)">Plataforma ${i+1}</b><button class="subdel" data-i="${i}" title="remover" style="background:none;border:0;color:var(--danger);cursor:pointer;font-size:16px;line-height:1">×</button></div>
+    <select class="submode" data-i="${i}" style="margin-top:5px"><option value="eq"${sa.mode==='eq'?' selected':''}>Equilíbrio local</option><option value="plano"${sa.mode==='plano'?' selected':''}>Cota fixa</option><option value="decliv"${sa.mode==='decliv'?' selected':''}>Declividade</option></select>
+    <input class="subcota num" data-i="${i}" type="number" step="0.5" placeholder="cota (m)" value="${sa.cota!=null?sa.cota:''}" style="margin-top:5px;display:${sa.mode==='plano'?'block':'none'}">
+    <input class="subdec num" data-i="${i}" type="number" step="0.5" placeholder="declividade (%)" value="${sa.dec!=null?sa.dec:''}" style="margin-top:5px;display:${sa.mode==='decliv'?'block':'none'}">
+  </div>`).join('');
+  el.querySelectorAll('.submode').forEach(s=>s.addEventListener('change',e=>{ const i=+e.target.dataset.i; subAreas[i].mode=e.target.value; renderSubList(); renderTerraLabels(); }));
+  el.querySelectorAll('.subcota').forEach(s=>s.addEventListener('input',e=>{ const i=+e.target.dataset.i; subAreas[i].cota=parseFloat(e.target.value); renderTerraLabels(); }));
+  el.querySelectorAll('.subdec').forEach(s=>s.addEventListener('input',e=>{ const i=+e.target.dataset.i; subAreas[i].dec=parseFloat(e.target.value); renderTerraLabels(); }));
+  el.querySelectorAll('.subdel').forEach(b=>b.addEventListener('click',e=>removeSubArea(+e.currentTarget.dataset.i))); }
+
+function terraRefresh(){ const has=!!lastGrid;
+  document.getElementById('terraReq').classList.toggle('hide',has);
+  document.getElementById('terraCtl').classList.toggle('hide',!has);
+  if(has){ const c=document.getElementById('terraCota'); if(!c.value) c.value=equilibriumCota().toFixed(1); renderSubList(); renderTerraLabels(); } }
+document.getElementById('terraMode').addEventListener('change',()=>{ const v=document.getElementById('terraMode').value;
+  document.getElementById('terraCotaWrap').style.display=v==='plano'?'':'none';
+  document.getElementById('terraDecWrap').style.display=v==='decliv'?'':'none';
+  renderTerraLabels(); });
+['terraCota','terraDec'].forEach(id=>{ const el=document.getElementById(id); if(el) el.addEventListener('input',renderTerraLabels); });
+document.getElementById('terraCalcBtn').addEventListener('click',computeEarthwork);
+map.on('click',e=>{ if(!drawingSub) return;
+  if(subPts.length>=3){ const p0=map.latLngToContainerPoint(subPts[0]), pc=map.latLngToContainerPoint(e.latlng); if(p0.distanceTo(pc)<12){ closeSub(); return; } }
+  subPts.push(e.latlng); redrawSub(); });
+map.on('dblclick',e=>{ if(drawingSub && subPts.length>=3) closeSub(); });
+document.getElementById('subAddBtn').addEventListener('click',()=>armSubDraw(!drawingSub));
+renderSubList();
+
+/* --- exportação da terraplanagem --- */
+async function buildTerraCanvas(bg){
+  const E=lastEarth, b={w:E.bbox.w,e:E.bbox.e,n:E.bbox.n,s:E.bbox.s};
+  const dy=(b.n-b.s)*0.06||1e-3,dx=(b.e-b.w)*0.06||1e-3; b.n+=dy;b.s-=dy;b.e+=dx;b.w-=dx;
+  let z=Math.round(Math.log2(1500*360/Math.max(1e-6,(b.e-b.w))/256)); z=Math.max(11,Math.min(19,z));
+  const oX=lon2px(b.w,z),oY=lat2px(b.n,z),W=Math.round(lon2px(b.e,z)-oX),H=Math.round(lat2px(b.s,z)-oY);
+  const cv=document.createElement('canvas'); cv.width=W; cv.height=H; const ctx=cv.getContext('2d');
+  ctx.fillStyle='#e9eef3'; ctx.fillRect(0,0,W,H);
+  if(bg==='map'){ const tx0=Math.floor(oX/256),tx1=Math.floor((oX+W)/256),ty0=Math.floor(oY/256),ty1=Math.floor((oY+H)/256);
+    for(const tpl of BASE_URLS[activeBase]){ const jobs=[];
+      for(let ty=ty0;ty<=ty1;ty++) for(let tx=tx0;tx<=tx1;tx++){ const url=tpl.replace('{z}',z).replace('{y}',ty).replace('{x}',tx);
+        jobs.push(loadImg(url).then(img=>{ if(img) ctx.drawImage(img,tx*256-oX,ty*256-oY); })); } await Promise.all(jobs); } }
+  const xW=lon2px(E.bbox.w,z)-oX,xE=lon2px(E.bbox.e,z)-oX,yN=lat2px(E.bbox.n,z)-oY,yS=lat2px(E.bbox.s,z)-oY;
+  ctx.imageSmoothingEnabled=true; ctx.globalAlpha=0.72; ctx.drawImage(E.gcanvas,xW,yN,xE-xW,yS-yN); ctx.globalAlpha=1;
+  const P=([lo,la])=>[lon2px(lo,z)-oX,lat2px(la,z)-oY];
+  if(lastContours){ lastContours.forEach(c=>{ ctx.strokeStyle='rgba(20,30,45,.4)'; ctx.lineWidth=isMaster(c.ele)?1.4:0.7;
+    c.rings.forEach(r=>{ ctx.beginPath(); r.forEach((pt,i)=>{ const q=P(pt); i?ctx.lineTo(q[0],q[1]):ctx.moveTo(q[0],q[1]); }); ctx.stroke(); }); }); }
+  if(polyPts.length>=3){ ctx.save(); ctx.setLineDash([10,7]); ctx.strokeStyle='#e0a24a'; ctx.lineWidth=Math.max(2,W/480);
+    ctx.beginPath(); polyPts.forEach((p,i)=>{ const q=P([p.lng,p.lat]); i?ctx.lineTo(q[0],q[1]):ctx.moveTo(q[0],q[1]); }); ctx.closePath(); ctx.stroke(); ctx.restore(); }
+  /* plataformas + rótulos de cota */
+  const lf=Math.max(13,Math.round(W/70)); ctx.textAlign='center'; ctx.textBaseline='middle';
+  const drawLabel=(poly,txt)=>{ const c=polyCentroid(poly), q=P(c), wd=ctx.measureText(txt).width+10;
+    ctx.fillStyle='rgba(238,242,247,.92)'; ctx.fillRect(q[0]-wd/2,q[1]-lf*0.8,wd,lf*1.6); ctx.strokeStyle='rgba(8,20,38,.5)'; ctx.strokeRect(q[0]-wd/2,q[1]-lf*0.8,wd,lf*1.6);
+    ctx.fillStyle='#0a1512'; ctx.font=`700 ${lf}px "IBM Plex Mono",monospace`; ctx.fillText(txt,q[0],q[1]); };
+  if(E.subs && E.subs.length){ subAreas.forEach((sa,i)=>{ const poly=sa.pts.map(p=>[p.lng,p.lat]); ctx.save(); ctx.setLineDash([8,5]); ctx.strokeStyle='#d98a2b'; ctx.lineWidth=Math.max(2,W/520);
+      ctx.beginPath(); sa.pts.forEach((p,k)=>{ const q=P([p.lng,p.lat]); k?ctx.lineTo(q[0],q[1]):ctx.moveTo(q[0],q[1]); }); ctx.closePath(); ctx.stroke(); ctx.restore();
+      drawLabel(poly, criterionLabel(poly,sa.mode,sa.cota,sa.dec)); }); }
+  else { const bc=baseCriterion(); drawLabel(maskPoly(), criterionLabel(maskPoly(),bc.mode,bc.cota,bc.dec)); }
+  drawTerraDecor(ctx,W,H); return cv;
+}
+function drawTerraDecor(ctx,W,H){
+  const E=lastEarth, pad=Math.round(W*0.012), ts=Math.max(16,Math.round(W/55));
+  ctx.fillStyle='rgba(12,27,48,.82)'; ctx.fillRect(0,0,W,ts+2*pad);
+  ctx.font=`700 ${ts}px "Space Grotesk",sans-serif`; ctx.fillStyle='#fff'; ctx.textAlign='left'; ctx.textBaseline='middle';
+  ctx.fillText('CotaCurva · Terraplanagem — corte e aterro', pad, pad+ts*0.6);
+  const fs=Math.max(13,Math.round(W/92)), D=terraDerived();
+  const lines=[`Corte (banco): ${fmtV(D.Vc)} m³`,`Transporte (solto +${D.e}%): ${fmtV(D.VcLoose)} m³`,`Aterro (compactado): ${fmtV(D.Va)} m³`,`Banco p/ aterro (fc ${D.fc}): ${fmtV(D.Vb)} m³`,`Saldo em banco: ${D.saldoB>=0?'+':''}${fmtV(D.saldoB)} m³ ${D.saldoB>=0?'(bota-fora)':'(empréstimo)'}`,`Cota de equilíbrio: ${E.eq.toFixed(2)} m`,`Área: ${(E.cells*E.cellA/10000).toFixed(2)} ha`];
+  ctx.font=`600 ${fs}px "IBM Plex Mono",monospace`; let bw=0; lines.forEach(t=>bw=Math.max(bw,ctx.measureText(t).width)); bw+=pad*2;
+  const bh=lines.length*(fs+7)+pad, bx=pad, by=ts+3*pad;
+  ctx.fillStyle='rgba(255,255,255,.92)'; ctx.fillRect(bx,by,bw,bh); ctx.textAlign='left'; ctx.textBaseline='top';
+  lines.forEach((t,i)=>{ ctx.fillStyle=(i===5)?'#1f6b2e':'#14233f'; ctx.font=`${i===5?'700':'600'} ${fs}px "IBM Plex Mono",monospace`; ctx.fillText(t,bx+pad,by+pad*0.6+i*(fs+7)); });
+  const lw=Math.round(W*0.22),lh=Math.max(12,Math.round(H*0.015)),ls=Math.max(12,Math.round(W/90)),lx=pad,ly=H-pad-lh-ls-6;
+  const grd=ctx.createLinearGradient(lx,0,lx+lw,0); grd.addColorStop(0,'#2c6fbf'); grd.addColorStop(.5,'#eef2f7'); grd.addColorStop(1,'#c0392b');
+  ctx.fillStyle=grd; ctx.fillRect(lx,ly,lw,lh); ctx.strokeStyle='rgba(0,0,0,.4)'; ctx.strokeRect(lx,ly,lw,lh);
+  ctx.font=`600 ${ls}px "IBM Plex Mono",monospace`; ctx.textBaseline='top';
+  const tag=(xx,t,al)=>{ ctx.textAlign=al; const m=ctx.measureText(t).width,bbx=al==='center'?xx-m/2:(al==='right'?xx-m:xx); ctx.fillStyle='rgba(255,255,255,.88)'; ctx.fillRect(bbx-2,ly+lh+3,m+4,ls+3); ctx.fillStyle='#14233f'; ctx.fillText(t,xx,ly+lh+4); };
+  tag(lx,`Aterro ${E.maxf.toFixed(1)} m`,'left'); tag(lx+lw/2,'equilíbrio','center'); tag(lx+lw,`Corte ${E.maxc.toFixed(1)} m`,'right');
+  const cs=Math.max(15,Math.round(W/75)); ctx.font=`600 ${cs}px "Space Grotesk",sans-serif`; ctx.textAlign='right'; ctx.textBaseline='bottom';
+  const cw=ctx.measureText(CREDIT).width; ctx.fillStyle='rgba(255,255,255,.72)'; ctx.fillRect(W-pad-cw-4,H-cs-6,cw+6,cs+5); ctx.fillStyle='#1b2a3a'; ctx.fillText(CREDIT,W-pad,H-3);
+}
+async function makeTerraCanvas(){ const bg=document.getElementById('bgMode').value;
+  if(bg==='map'){ const cv=await buildTerraCanvas('map'); try{ cv.getContext('2d').getImageData(0,0,1,1); return cv; }catch(e){ return await buildTerraCanvas('none'); } }
+  return await buildTerraCanvas(bg); }
+
+/* gráfico do perfil médio (terreno x projeto) para planilha/relatório */
+function buildMeanProfileCanvas(W,H){
+  const E=lastEarth, pr=E.profile; W=W||900; H=H||360; const ml=70,mr=24,mt=40,mb=52;
+  const cv=document.createElement('canvas'); cv.width=W; cv.height=H; const ctx=cv.getContext('2d');
+  ctx.fillStyle='#fff'; ctx.fillRect(0,0,W,H);
+  ctx.fillStyle='#0c1b30'; ctx.font='700 17px "Space Grotesk",sans-serif'; ctx.textAlign='left'; ctx.textBaseline='middle'; ctx.fillText('Perfil médio — terreno × projeto',16,20);
+  const all=pr.zt.concat(pr.zd), zmin=Math.min(...all), zmax=Math.max(...all), pad=Math.max(1,(zmax-zmin)*0.15), tot=pr.dist[pr.dist.length-1]||1;
+  const x=d=>ml+d/tot*(W-ml-mr), y=z=>H-mb-(z-(zmin-pad))/((zmax+pad)-(zmin-pad))*(H-mb-mt);
+  ctx.strokeStyle='#dbe2ea'; ctx.fillStyle='#5f7590'; ctx.font='12px "IBM Plex Mono",monospace';
+  for(let t=0;t<=5;t++){ const zz=zmin-pad+(zmax+pad-(zmin-pad))*t/5, yy=y(zz); ctx.beginPath(); ctx.moveTo(ml,yy); ctx.lineTo(W-mr,yy); ctx.stroke(); ctx.textAlign='right'; ctx.textBaseline='middle'; ctx.fillText(zz.toFixed(0),ml-6,yy); }
+  ctx.textAlign='center'; ctx.textBaseline='top';
+  for(let t=0;t<=6;t++){ const dd=tot*t/6; ctx.fillText(dd.toFixed(0),x(dd),H-mb+6); }
+  for(let i=0;i<pr.dist.length;i++){ const xx=x(pr.dist[i]); ctx.strokeStyle=pr.zt[i]>=pr.zd[i]?'rgba(192,57,43,.5)':'rgba(44,111,191,.5)'; ctx.lineWidth=Math.max(1,(W-ml-mr)/pr.dist.length); ctx.beginPath(); ctx.moveTo(xx,y(pr.zt[i])); ctx.lineTo(xx,y(pr.zd[i])); ctx.stroke(); }
+  ctx.beginPath(); pr.dist.forEach((d,i)=>{ i?ctx.lineTo(x(d),y(pr.zt[i])):ctx.moveTo(x(d),y(pr.zt[i])); }); ctx.strokeStyle='#1b2a3a'; ctx.lineWidth=2.5; ctx.stroke();
+  ctx.beginPath(); pr.dist.forEach((d,i)=>{ i?ctx.lineTo(x(d),y(pr.zd[i])):ctx.moveTo(x(d),y(pr.zd[i])); }); ctx.strokeStyle='#7a5cc0'; ctx.lineWidth=2.5; ctx.setLineDash([8,4]); ctx.stroke(); ctx.setLineDash([]);
+  ctx.fillStyle='#5f7590'; ctx.font='12px "Space Grotesk",sans-serif'; ctx.textAlign='center'; ctx.textBaseline='alphabetic'; ctx.fillText('Distância transversal (m)',(ml+W-mr)/2,H-16);
+  ctx.fillStyle='#1b2a3a'; ctx.textAlign='right'; ctx.fillText('— terreno   - - projeto (vermelho=corte, azul=aterro)',W-mr,24);
+  return cv;
+}
+function buildTerraDXF(){
+  const E=lastEarth, G=lastGrid, g=G.g;
+  const zone=(lastMeta&&lastMeta.zone)||utmZone((G.w+G.e)/2), hemi=(lastMeta&&lastMeta.hemi)||(((G.n+G.s)/2)<0?'S':'N');
+  const design=terraDesignEval||(()=>E.eq);
+  const out=[]; const p=(c,v)=>{ out.push(c); out.push(v); };
+  let xmn=1e18,ymn=1e18,xmx=-1e18,ymx=-1e18; const cellPts=[];
+  for(let j=0;j<g;j++) for(let i=0;i<g;i++){ const lon=G.w+i/(g-1)*(G.e-G.w), lat=G.n-j/(g-1)*(G.n-G.s);
+    if(!pip([lon,lat],E.poly)) continue; const d=G.values[j*g+i]-design(lon,lat); const uv=llToUTM(lat,lon,zone);
+    if(uv[0]<xmn)xmn=uv[0];if(uv[0]>xmx)xmx=uv[0];if(uv[1]<ymn)ymn=uv[1];if(uv[1]>ymx)ymx=uv[1];
+    cellPts.push([uv[0],uv[1],G.values[j*g+i],d]); }
+  const permUTM=polyPts.length>=3?polyPts.map(pt=>{ const u=llToUTM(pt.lat,pt.lng,zone); return u; }):[];
+  const th=Math.max(1,Math.min(20,(xmx-xmn)/120));
+  p(0,'SECTION');p(2,'HEADER');p(9,'$ACADVER');p(1,'AC1009');p(9,'$TILEMODE');p(70,1);
+  p(9,'$EXTMIN');p(10,xmn.toFixed(3));p(20,ymn.toFixed(3));p(30,'0.0');
+  p(9,'$EXTMAX');p(10,xmx.toFixed(3));p(20,ymx.toFixed(3));p(30,'0.0');p(0,'ENDSEC');
+  p(0,'SECTION');p(2,'TABLES');
+  p(0,'TABLE');p(2,'LTYPE');p(70,1);p(0,'LTYPE');p(2,'CONTINUOUS');p(70,0);p(3,'Solid line');p(72,65);p(73,0);p(40,0.0);p(0,'ENDTAB');
+  const layers=[['Perimetro',7],['Corte',1],['Aterro',5],['Plataformas',30],['Resultado',3],['Cota_Equilibrio',2]];
+  p(0,'TABLE');p(2,'LAYER');p(70,layers.length); layers.forEach(a=>{ p(0,'LAYER');p(2,a[0]);p(70,0);p(62,a[1]);p(6,'CONTINUOUS'); }); p(0,'ENDTAB');p(0,'ENDSEC');
+  p(0,'SECTION');p(2,'ENTITIES');
+  cellPts.forEach(c=>{ p(0,'POINT');p(8,c[3]>0?'Corte':'Aterro');p(62,c[3]>0?1:5);p(10,c[0].toFixed(3));p(20,c[1].toFixed(3));p(30,c[2].toFixed(3)); });
+  if(permUTM.length){ p(0,'POLYLINE');p(8,'Perimetro');p(62,7);p(66,1);p(70,1);p(10,'0.0');p(20,'0.0');p(30,'0.0');
+    permUTM.forEach(u=>{ p(0,'VERTEX');p(8,'Perimetro');p(10,u[0].toFixed(3));p(20,u[1].toFixed(3));p(30,E.eq.toFixed(3)); }); p(0,'SEQEND');p(8,'Perimetro'); }
+  subAreas.forEach((sa,i)=>{ const poly=sa.pts.map(pt=>[pt.lng,pt.lat]); p(0,'POLYLINE');p(8,'Plataformas');p(62,30);p(66,1);p(70,1);p(10,'0.0');p(20,'0.0');p(30,'0.0');
+    sa.pts.forEach(pt=>{ const u=llToUTM(pt.lat,pt.lng,zone); p(0,'VERTEX');p(8,'Plataformas');p(10,u[0].toFixed(3));p(20,u[1].toFixed(3));p(30,'0.0'); }); p(0,'SEQEND');p(8,'Plataformas');
+    const c=polyCentroid(poly), u=llToUTM(c[1],c[0],zone); p(0,'TEXT');p(8,'Plataformas');p(10,u[0].toFixed(3));p(20,u[1].toFixed(3));p(30,'0.0');p(40,(th*1.2).toFixed(3));p(1,'P'+(i+1)+' '+criterionLabel(poly,sa.mode,sa.cota,sa.dec)); });
+  const res=[`Corte = ${Math.round(E.cut)} m3`,`Aterro = ${Math.round(E.fill)} m3`,`Saldo = ${Math.round(E.net)} m3`,`Area = ${(E.cells*E.cellA/10000).toFixed(2)} ha`];
+  res.forEach((t,i)=>{ p(0,'TEXT');p(8,'Resultado');p(10,xmn.toFixed(3));p(20,(ymn-th*3-i*th*1.6).toFixed(3));p(30,'0.0');p(40,th.toFixed(3));p(1,t); });
+  p(0,'TEXT');p(8,'Cota_Equilibrio');p(10,xmn.toFixed(3));p(20,(ymn-th*3-res.length*th*1.6).toFixed(3));p(30,'0.0');p(40,(th*1.3).toFixed(3));p(1,`Cota equilibrio = ${E.eq.toFixed(2)} m`);
+  p(0,'ENDSEC');p(0,'EOF'); return out.join('\n')+'\n';
+}
+document.getElementById('terraDxfBtn').addEventListener('click',()=>{ if(!lastEarth) return;
+  const zone=(lastMeta&&lastMeta.zone)||utmZone((lastGrid.w+lastGrid.e)/2), hemi=(lastMeta&&lastMeta.hemi)||'S';
+  download(`terraplanagem_UTM${zone}${hemi}.dxf`, buildTerraDXF(), 'application/dxf'); });
+document.getElementById('terraPngBtn').addEventListener('click',async()=>{ if(!lastEarth) return; const btn=document.getElementById('terraPngBtn'); btn.disabled=true; btn.textContent='Gerando…';
+  try{ const cv=await makeTerraCanvas(); cv.toBlob(bl=>{ const u=URL.createObjectURL(bl),a=document.createElement('a'); a.href=u; a.download='terraplanagem.png'; a.click(); setTimeout(()=>URL.revokeObjectURL(u),2000); },'image/png'); }
+  catch(e){} btn.textContent='Imagem PNG'; btn.disabled=false; });
+document.getElementById('terraPdfBtn').addEventListener('click',async()=>{ if(!lastEarth) return; const btn=document.getElementById('terraPdfBtn'); btn.disabled=true; btn.textContent='Gerando…';
+  try{ const cv=await makeTerraCanvas(),img=cv.toDataURL('image/png'),{jsPDF}=window.jspdf;
+    const doc=new jsPDF({orientation:cv.width>=cv.height?'landscape':'portrait',unit:'mm',format:'a4'});
+    const pw=doc.internal.pageSize.getWidth(),ph=doc.internal.pageSize.getHeight(),mg=10,r=Math.min((pw-2*mg)/cv.width,(ph-2*mg-10)/cv.height),iw=cv.width*r,ih=cv.height*r;
+    doc.addImage(img,'PNG',(pw-iw)/2,mg,iw,ih); doc.setFontSize(8); doc.setTextColor(90);
+    doc.text(CREDIT+' · UTM '+((lastMeta&&lastMeta.zone)||'')+((lastMeta&&lastMeta.hemi)||''), pw/2, ph-6, {align:'center'});
+    doc.save('terraplanagem.pdf'); }catch(e){} btn.textContent='PDF'; btn.disabled=false; });
+
+async function buildTerraReport(){
+  const {jsPDF}=window.jspdf, E=lastEarth, D=terraDerived();
+  const doc=new jsPDF({unit:'mm',format:'a4'});
+  const pw=doc.internal.pageSize.getWidth(), ph=doc.internal.pageSize.getHeight(), mg=14;
+  doc.setFillColor(12,27,48); doc.rect(0,0,pw,20,'F');
+  doc.setTextColor(255); doc.setFont('helvetica','bold'); doc.setFontSize(15); doc.text('CotaCurva · Relatório de Terraplanagem', mg, 13);
+  doc.setTextColor(60); doc.setFont('helvetica','normal'); doc.setFontSize(9);
+  const cLat=((E.bbox.n+E.bbox.s)/2).toFixed(5), cLon=((E.bbox.e+E.bbox.w)/2).toFixed(5);
+  const zone=(lastMeta&&lastMeta.zone)||'', hemi=(lastMeta&&lastMeta.hemi)||'';
+  doc.text(`Data: ${new Date().toLocaleString('pt-BR')}    Centro: ${cLat}, ${cLon}    UTM ${zone}${hemi}`, mg, 27);
+  let y=33;
+  try{ const cv=await makeTerraCanvas(); const img=cv.toDataURL('image/png'); const availW=pw-2*mg, r=Math.min(availW/cv.width,110/cv.height), iw=cv.width*r, ih=cv.height*r; doc.addImage(img,'PNG',(pw-iw)/2,y,iw,ih); y+=ih+6; }catch(e){ y+=4; }
+  try{ const pc=buildMeanProfileCanvas(900,300); const img2=pc.toDataURL('image/png'); const availW=pw-2*mg, r=availW/pc.width, iw=availW, ih=pc.height*r; if(y+ih>ph-20){doc.addPage(); y=18;} doc.addImage(img2,'PNG',mg,y,iw,ih); y+=ih+6; }catch(e){}
+  if(y>ph-50){doc.addPage(); y=18;}
+  doc.setTextColor(20,35,63); doc.setFont('helvetica','bold'); doc.setFontSize(12); doc.text('Resumo de volumes', mg, y); y+=7;
+  doc.setFont('helvetica','normal'); doc.setFontSize(10);
+  const rows=[['Área terraplanada',(E.cells*E.cellA/10000).toFixed(2)+' ha'],['Cota de equilíbrio',E.eq.toFixed(2)+' m'],
+    ['Corte (banco, geométrico)',fmtV(E.cut)+' m³'],['Aterro (compactado, geométrico)',fmtV(E.fill)+' m³'],
+    ['Empolamento adotado',D.e+' %'],['Volume solto a transportar',fmtV(D.VcLoose)+' m³'],
+    ['Fator de compactação',String(D.fc)],['Banco necessário p/ aterro',fmtV(D.Vb)+' m³'],
+    ['Saldo em banco',(D.saldoB>=0?'+':'')+fmtV(D.saldoB)+' m³ '+(D.saldoB>=0?'(bota-fora)':'(empréstimo)')],
+    ['Corte máx · aterro máx',E.maxc.toFixed(2)+' · '+E.maxf.toFixed(2)+' m']];
+  rows.forEach(a=>{ if(y>ph-24){ doc.addPage(); y=18; } doc.setTextColor(90); doc.text(a[0]+':',mg,y); doc.setTextColor(20,35,63); doc.text(String(a[1]),mg+82,y); y+=6.6; });
+  if(E.regions){ if(y>ph-30){doc.addPage(); y=18;} y+=2; doc.setFont('helvetica','bold'); doc.setTextColor(20,35,63); doc.setFontSize(11); doc.text('Volumes por plataforma',mg,y); y+=6; doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(40);
+    E.regions.forEach(r=>{ if(!r.cells) return; if(y>ph-18){doc.addPage(); y=18;} doc.text(`${r.name}: corte ${fmtV(r.cut)} m³ · aterro ${fmtV(r.fill)} m³`,mg,y); y+=5; }); }
+  if(y>ph-26){doc.addPage(); y=18;} y+=4; doc.setFontSize(8); doc.setTextColor(120);
+  doc.text('Volumes estimados a partir de MDE de satélite (~30 m), para ensino e anteprojeto. Para medição de obra, usar levantamento topográfico.', mg, y, {maxWidth:pw-2*mg});
+  doc.setFontSize(9); doc.setTextColor(90); doc.text(CREDIT, pw/2, ph-8, {align:'center'});
+  doc.save('relatorio_terraplanagem.pdf');
+}
+/* --- planilha XLSX (ExcelJS) --- */
+async function buildTerraXLSX(){
+  const E=lastEarth, D=terraDerived(), wb=new ExcelJS.Workbook();
+  wb.creator='CotaCurva — Prof. Me. Rodrigo Gonçalves (Oswy)'; wb.created=new Date();
+  const zone=(lastMeta&&lastMeta.zone)||'', hemi=(lastMeta&&lastMeta.hemi)||'';
+  const ws=wb.addWorksheet('Resumo'); ws.columns=[{width:34},{width:20},{width:14}];
+  const title=ws.addRow(['CotaCurva — Relatório de Terraplanagem']); title.font={bold:true,size:14,color:{argb:'FF0C1B30'}};
+  ws.addRow(['Data', new Date().toLocaleString('pt-BR')]);
+  ws.addRow(['Centro', `${((E.bbox.n+E.bbox.s)/2).toFixed(5)}, ${((E.bbox.e+E.bbox.w)/2).toFixed(5)}`]);
+  ws.addRow(['Projeção', `UTM ${zone}${hemi} / WGS84`]);
+  ws.addRow([]);
+  const hdr=ws.addRow(['Parâmetro','Valor','Unid.']); hdr.font={bold:true,color:{argb:'FFFFFFFF'}}; hdr.eachCell(c=>{c.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF123A6B'}};});
+  const data=[
+    ['Área terraplanada', +(E.cells*E.cellA/10000).toFixed(4),'ha'],
+    ['Área terraplanada', Math.round(E.cells*E.cellA),'m²'],
+    ['Cota de equilíbrio', +E.eq.toFixed(2),'m'],
+    ['Corte (banco, geométrico)', Math.round(E.cut),'m³'],
+    ['Aterro (compactado, geométrico)', Math.round(E.fill),'m³'],
+    ['Saldo geométrico (corte−aterro)', Math.round(E.net),'m³'],
+    ['Empolamento adotado', D.e,'%'],
+    ['Volume solto a transportar', Math.round(D.VcLoose),'m³'],
+    ['Fator de compactação', D.fc,'—'],
+    ['Banco necessário p/ aterro', Math.round(D.Vb),'m³'],
+    ['Saldo em banco (corte−banco p/ aterro)', Math.round(D.saldoB),'m³'],
+    [D.saldoB>=0?'Bota-fora (solto)':'Empréstimo (banco)', Math.round(D.saldoB>=0?D.saldoB*(1+D.e/100):-D.saldoB),'m³'],
+    ['Corte máximo', +E.maxc.toFixed(2),'m'],
+    ['Aterro máximo', +E.maxf.toFixed(2),'m']
+  ];
+  data.forEach(r=>{ const row=ws.addRow(r); row.getCell(2).numFmt='#,##0.00'; });
+  if(E.regions){ ws.addRow([]); const h2=ws.addRow(['Plataforma','Corte (m³)','Aterro (m³)']); h2.font={bold:true}; 
+    E.regions.forEach(r=>{ if(r.cells) ws.addRow([r.name, Math.round(r.cut), Math.round(r.fill)]); }); }
+
+  /* aba perfil médio: dados + gráfico (imagem) */
+  const ps=wb.addWorksheet('Perfil médio'); ps.columns=[{header:'Dist. (m)',width:12},{header:'Terreno (m)',width:14},{header:'Projeto (m)',width:14},{header:'Dif. (m)',width:12},{header:'Situação',width:12}];
+  ps.getRow(1).font={bold:true}; ps.getRow(1).eachCell(c=>{c.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF123A6B'}}; c.font={bold:true,color:{argb:'FFFFFFFF'}};});
+  const pr=E.profile;
+  for(let i=0;i<pr.dist.length;i++){ const dif=pr.zt[i]-pr.zd[i]; const row=ps.addRow([+pr.dist[i].toFixed(1),+pr.zt[i].toFixed(2),+pr.zd[i].toFixed(2),+dif.toFixed(2), dif>=0?'Corte':'Aterro']);
+    row.getCell(5).font={color:{argb: dif>=0?'FFB01B12':'FF1B5EBF'}}; }
+  try{ const pc=buildMeanProfileCanvas(900,340); const b64=pc.toDataURL('image/png').split(',')[1];
+    const imgId=wb.addImage({base64:b64, extension:'png'}); ps.addImage(imgId,{tl:{col:6,row:1},ext:{width:620,height:234}}); }catch(e){}
+
+  const buf=await wb.xlsx.writeBuffer(); download('terraplanagem.xlsx', buf, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+}
+/* --- esquemas explicativos (hover) --- */
+function svgCutFill(){ return `<svg viewBox="0 0 190 95" xmlns="http://www.w3.org/2000/svg"><line x1="10" y1="55" x2="180" y2="55" stroke="#9fb2c9" stroke-width="2"/><path d="M10,55 L30,30 L70,22 L95,55 Z" fill="rgba(192,57,43,.6)"/><path d="M95,55 L120,75 L160,72 L180,55 Z" fill="rgba(44,111,191,.6)"/><polyline points="10,55 30,30 70,22 95,55 120,75 160,72 180,55" fill="none" stroke="#e7eef6" stroke-width="2"/><text x="40" y="44" fill="#ff9a8c" font-size="10" font-family="monospace">corte</text><text x="124" y="69" fill="#8fc0ff" font-size="10" font-family="monospace">aterro</text><text x="146" y="51" fill="#9fb2c9" font-size="9" font-family="monospace">projeto</text></svg>`; }
+function svgEq(){ return `<svg viewBox="0 0 190 95" xmlns="http://www.w3.org/2000/svg"><polyline points="10,28 55,72 100,38 150,76 180,44" fill="none" stroke="#e7eef6" stroke-width="2"/><line x1="10" y1="52" x2="180" y2="52" stroke="#5fe08a" stroke-width="2" stroke-dasharray="5 3"/><text x="12" y="48" fill="#5fe08a" font-size="9" font-family="monospace">equilíbrio</text><text x="146" y="32" fill="#ff9a8c" font-size="11" font-family="monospace">+corte</text><text x="56" y="88" fill="#8fc0ff" font-size="11" font-family="monospace">−aterro</text></svg>`; }
+function svgEmp(){ return `<svg viewBox="0 0 190 95" xmlns="http://www.w3.org/2000/svg"><rect x="18" y="48" width="42" height="32" fill="#8a6b4a"/><text x="18" y="92" font-size="9" font-family="monospace" fill="#9fb2c9">banco 1 m³</text><rect x="112" y="28" width="52" height="52" fill="#b08968"/><text x="110" y="92" font-size="9" font-family="monospace" fill="#9fb2c9">solto 1,25 m³</text><text x="72" y="62" fill="#e7eef6" font-size="18" font-family="monospace">→</text></svg>`; }
+function svgComp(){ return `<svg viewBox="0 0 190 95" xmlns="http://www.w3.org/2000/svg"><rect x="18" y="26" width="48" height="54" fill="#b08968"/><text x="20" y="92" font-size="9" font-family="monospace" fill="#9fb2c9">banco</text><rect x="118" y="50" width="48" height="30" fill="#6b4f36"/><text x="110" y="92" font-size="9" font-family="monospace" fill="#9fb2c9">compactado</text><text x="76" y="60" fill="#e7eef6" font-size="18" font-family="monospace">→</text></svg>`; }
+function svgTalude(){ return `<svg viewBox="0 0 190 95" xmlns="http://www.w3.org/2000/svg"><polygon points="38,76 150,76 118,30 70,30" fill="rgba(176,137,104,.45)" stroke="#b08968" stroke-width="2"/><line x1="70" y1="30" x2="38" y2="76" stroke="#ff9a8c" stroke-width="2"/><text x="12" y="56" fill="#ff9a8c" font-size="10" font-family="monospace">1V</text><text x="40" y="90" fill="#ff9a8c" font-size="10" font-family="monospace">1,5H</text><text x="86" y="58" fill="#e7eef6" font-size="9" font-family="monospace">aterro</text></svg>`; }
+const TIPS={
+  corte:{t:'Corte (escavação): retirar terra onde o terreno natural está ACIMA da superfície de projeto.', s:svgCutFill()},
+  aterro:{t:'Aterro: colocar terra onde o terreno natural está ABAIXO do projeto.', s:svgCutFill()},
+  equilibrio:{t:'Cota de equilíbrio: cota do plano em que o volume de corte iguala o de aterro — saldo de material zero.', s:svgEq()},
+  criterio:{t:'Critério: como a superfície de projeto é definida — nivelar na cota de equilíbrio, uma cota fixa, ou um plano com declividade (caimento).', s:svgEq()},
+  empolamento:{t:'Empolamento: a terra escavada aumenta de volume (fica solta). Ex.: 1 m³ no banco vira ~1,25 m³ no caminhão. Dimensiona o transporte.', s:svgEmp()},
+  compactacao:{t:'Fator de compactação: no aterro a terra é comprimida e ocupa menos. Para 1 m³ compactado é preciso mais de 1 m³ de banco (fc < 1).', s:svgComp()},
+  talude:{t:'Declividade / talude: inclinação dada à superfície. Ex.: 2% de caimento para drenagem; talude de 1V:1,5H nas laterais de aterro.', s:svgTalude()},
+  subarea:{t:'Plataforma: um polígono dentro da área com critério próprio (cota fixa, equilíbrio local ou declividade). Permite vários patamares em cotas diferentes no mesmo terreno. O restante usa o critério da área inteira.', s:svgEq()}
+};
+const infotip=document.createElement('div'); infotip.className='infotip-pop'; document.body.appendChild(infotip);
+document.addEventListener('mouseover',e=>{ const ic=e.target.closest&&e.target.closest('.ico'); if(!ic) return;
+  const d=TIPS[ic.dataset.tip]; if(!d) return; infotip.innerHTML=(d.s||'')+'<p>'+d.t+'</p>'; infotip.style.display='block';
+  const r=ic.getBoundingClientRect(), tw=infotip.offsetWidth, thh=infotip.offsetHeight;
+  let x=Math.min(Math.max(8,r.left-10), window.innerWidth-tw-8), y=r.bottom+8; if(y+thh>window.innerHeight-8) y=r.top-thh-8;
+  infotip.style.left=x+'px'; infotip.style.top=Math.max(8,y)+'px'; });
+document.addEventListener('mouseout',e=>{ if(e.target.closest&&e.target.closest('.ico')) infotip.style.display='none'; });
+['terraEmp','terraFc'].forEach(id=>{ const el=document.getElementById(id); if(el) el.addEventListener('input',()=>{ if(lastEarth) renderTerraOut(); }); });
+document.getElementById('terraRepBtn').addEventListener('click',async()=>{ if(!lastEarth) return; const btn=document.getElementById('terraRepBtn'); btn.disabled=true; btn.textContent='Gerando…';
+  try{ await buildTerraReport(); }catch(e){} btn.textContent='Relatório PDF'; btn.disabled=false; });
+document.getElementById('terraXlsBtn').addEventListener('click',async()=>{ if(!lastEarth) return; const btn=document.getElementById('terraXlsBtn'); btn.disabled=true; btn.textContent='Gerando…';
+  try{ await buildTerraXLSX(); }catch(e){ setStatus&&setStatus('Falha ao gerar planilha: '+e.message,true); } btn.textContent='Planilha XLSX'; btn.disabled=false; });
+function clearTerra(){
+  if(drawingSub) armSubDraw(false);
+  if(earthLayer){map.removeLayer(earthLayer);earthLayer=null;}
+  if(terraLabelLayer){map.removeLayer(terraLabelLayer);terraLabelLayer=null;}
+  subAreas.forEach(sa=>{ if(sa.layer) map.removeLayer(sa.layer); }); subAreas=[]; renderSubList();
+  terraDesignActive=false; terraDesignEval=null; lastEarth=null;
+  document.getElementById('terraOut').innerHTML='<div class="empty">Defina o critério (ou plataformas) e calcule.</div>';
+  document.getElementById('terraLegend').classList.remove('on');
+  ['terraDxfBtn','terraPngBtn','terraPdfBtn','terraRepBtn','terraXlsBtn'].forEach(id=>{const b=document.getElementById(id); if(b) b.disabled=true;});
+}
+document.getElementById('terraClearBtn').addEventListener('click',clearTerra);
+
+
 function clearAll(){
   if(selecting) armSelect(false);
   polyPts=[]; polygonClosed=false; clearPolyLayers();
@@ -1145,6 +1612,8 @@ function clearAll(){
   if(ptsLayer){map.removeLayer(ptsLayer);ptsLayer=null;}
   if(searchMarker){map.removeLayer(searchMarker);searchMarker=null;}
   lastContours=null; lastMeta=null; lastProfile=null; lastGrid=null;
+  clearTerra();
+  if(activeTab==='terra') terraRefresh();
   document.getElementById('resOut').innerHTML='<div class="empty">Ainda sem curvas geradas.</div>';
   document.getElementById('legend').classList.remove('on');
   ['dxfBtn','kmlBtn','pngBtn','pdfBtn'].forEach(id=>{const b=document.getElementById(id); if(b) b.disabled=true;});
